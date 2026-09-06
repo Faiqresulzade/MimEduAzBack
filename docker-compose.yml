@@ -1,22 +1,21 @@
 services:
-  mysql:
-    image: mariadb:10.6
-    container_name: mimedu-mysql
+  postgres:
+    image: postgres:16-alpine
+    container_name: mimedu-postgres
     restart: unless-stopped
     environment:
-      MARIADB_ROOT_PASSWORD: root
-      MARIADB_DATABASE: mimedu_dev
-      MARIADB_USER: mimedu
-      MARIADB_PASSWORD: mimedu
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mimedu_dev
     ports:
-      - "3307:3306"
+      - "5434:5432"
     volumes:
-      - mimedu-mysqldata:/var/lib/mysql
+      - mimedu-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mimedu_dev"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  mimedu-mysqldata:
+  mimedu-pgdata:

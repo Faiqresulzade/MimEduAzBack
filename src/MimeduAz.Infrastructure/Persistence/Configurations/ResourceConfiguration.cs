@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using MimeduAz.Domain.Entities;
-using MimeduAz.Infrastructure.Persistence.Conversions;
 
 namespace MimeduAz.Infrastructure.Persistence.Configurations;
 
@@ -46,9 +45,7 @@ public sealed class BlogPostConfiguration : IEntityTypeConfiguration<BlogPost>
         builder.Property(p => p.ReadTime).IsRequired().HasMaxLength(20);
         builder.Property(p => p.Excerpt).IsRequired().HasMaxLength(600);
 
-        // MySQL-də doğma massiv tipi yoxdur - paraqraflar JSON mətn sütununda saxlanılır.
-        builder.Property(p => p.Body)
-            .HasConversion(StringListJsonConverter.Converter, StringListJsonConverter.Comparer)
-            .HasColumnType("json");
+        // Paraqraflar Postgres-in doğma text[] massivində saxlanılır - ayrıca cədvələ ehtiyac yoxdur.
+        builder.Property(p => p.Body).HasColumnType("text[]");
     }
 }

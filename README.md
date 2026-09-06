@@ -1,7 +1,7 @@
 # MIMEDU.AZ — Backend
 
 Azərbaycan müəllimləri üçün rəqəmsal təhsil platformasının backend API-si.
-ASP.NET Core 8 Web API + MySQL/MariaDB + EF Core (Code-First), JWT autentifikasiya.
+ASP.NET Core 8 Web API + PostgreSQL (Supabase) + EF Core (Code-First), JWT autentifikasiya.
 
 > **Ödəniş barədə:** checkout tam **demo/mock** rejimdədir. Backend heç bir kart məlumatı
 > qəbul etmir və saxlamır; sifariş birbaşa `Paid` statusunda yaradılır.
@@ -13,7 +13,7 @@ ASP.NET Core 8 Web API + MySQL/MariaDB + EF Core (Code-First), JWT autentifikasi
 | Alət | Versiya |
 |---|---|
 | .NET SDK | 8.0+ |
-| MySQL / MariaDB | 8.0+ / 10.6+ (yerli inkişaf üçün Docker kifayətdir) |
+| PostgreSQL | 14+ (yerli inkişaf üçün Docker kifayətdir) |
 | `dotnet-ef` | 8.0.8 (`dotnet tool update --global dotnet-ef --version 8.0.8`) |
 
 ---
@@ -21,7 +21,7 @@ ASP.NET Core 8 Web API + MySQL/MariaDB + EF Core (Code-First), JWT autentifikasi
 ## Sürətli başlanğıc
 
 ```bash
-# 1. Local MariaDB-ni qaldır (Docker ilə) — host portu 3307
+# 1. Local PostgreSQL-i qaldır (Docker ilə) — host portu 5434
 docker compose up -d
 
 # 2. API-ni işə sal (migration + seed avtomatik tətbiq olunur)
@@ -30,8 +30,8 @@ dotnet run --project src/MimeduAz.Api
 # 3. Swagger: http://localhost:5297/swagger
 ```
 
-> Konteyner **3307** host portuna bağlanır ki, maşında artıq işləyən başqa
-> MySQL/MariaDB instansı ilə toqquşmasın. Dəyişmək istəsəniz `docker-compose.yml`
+> Konteyner **5434** host portuna bağlanır ki, maşında artıq işləyən başqa
+> PostgreSQL instansı ilə toqquşmasın. Dəyişmək istəsəniz `docker-compose.yml`
 > və `appsettings.Development.json`-dakı portu birlikdə yeniləyin.
 
 ### Uçdan-uca smoke test
@@ -45,7 +45,8 @@ node scripts/smoke-test.mjs
 
 > Skript təzə seed data gözləyir. Təkrar icradan əvvəl bazanı sıfırlayın (local Docker):
 > ```bash
-> docker exec -it mimedu-mysql mysql -uroot -proot -e "DROP DATABASE IF EXISTS mimedu_dev; CREATE DATABASE mimedu_dev;"
+> docker exec mimedu-postgres psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS mimedu_dev WITH (FORCE);"
+> docker exec mimedu-postgres psql -U postgres -d postgres -c "CREATE DATABASE mimedu_dev;"
 > ```
 
 Development mühitində tətbiq qalxarkən `Database.MigrateAsync()` və `DataSeeder`
@@ -104,7 +105,7 @@ MimeduAz.sln
 ├── tests/
 │   └── MimeduAz.Tests/           # Biznes məntiq üzrə unit testlər (38 test)
 ├── scripts/smoke-test.mjs        # Real API üzərində uçdan-uca yoxlama (100 assertion)
-├── docker-compose.yml            # Local MariaDB
+├── docker-compose.yml            # Local PostgreSQL
 └── requests.http                 # Manual API testləri
 ```
 
@@ -122,13 +123,13 @@ Application qatı bazaya `IApplicationDbContext` abstraksiyası ilə çıxır.
 ```bash
 cd src/MimeduAz.Api
 dotnet user-secrets init
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "server=HOST;port=3306;database=DB;user=USER;password=PASS;"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=HOST;Port=5432;Database=DB;Username=USER;Password=PASS;SSL Mode=Require;Trust Server Certificate=true"
 dotnet user-secrets set "Jwt:SecretKey" "<ən azı 32 simvol>"
 ```
 
 | Açar | Təyinat |
 |---|---|
-| `ConnectionStrings:DefaultConnection` | MySQL/MariaDB bağlantısı (MySqlConnector formatı) |
+| `ConnectionStrings:DefaultConnection` | PostgreSQL bağlantısı (Npgsql formatı) |
 | `Jwt:Issuer` / `Jwt:Audience` | Token issuer/audience |
 | `Jwt:SecretKey` | HMAC imza açarı (**ən azı 32 simvol**, əks halda tətbiq qalxmır) |
 | `Jwt:AccessTokenExpiryMinutes` | Access token ömrü (default 15) |
@@ -141,29 +142,50 @@ dotnet user-secrets set "Jwt:SecretKey" "<ən azı 32 simvol>"
 
 ---
 
-## Production/staging bazası (Natro / Plesk)
+## Production bazası (Supabase PostgreSQL)
 
-Layihə hazırda Natro-nun Plesk paneli üzərindəki MySQL/MariaDB (10.6) bazasına
-qoşulacaq şəkildə konfiqurasiya edilib. Bağlantı sətri **yalnız user-secrets**-də
-saxlanılır, heç bir `appsettings*.json` faylına yazılmayıb.
+Bağlantı sətri **yalnız user-secrets** və ya environment variable ilə verilir,
+heç bir `appsettings*.json` faylına yazılmır.
 
 ```bash
 cd src/MimeduAz.Api
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "server=<host>;port=3306;database=<db>;user=<user>;password=<parol>;"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=<region>.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.<proje-ref>;Password=<parol>;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=10;Connection Idle Lifetime=60;Keepalive=30"
 ```
 
-**Vacib qeyd — uzaqdan giriş:** Plesk-in `Remote MySQL Access` bölməsində
-qoşulacaq maşının ictimai IP-si ağ siyahıya əlavə olunmalıdır, əks halda
-`Access denied for user '...'@'<ip>'` xətası alınır. Development zamanı bu
-qeydin bəzən qısa müddətdən sonra sıfırlandığı müşahidə olundu — problem
-təkrarlansa, panel-də qeydin hələ də mövcud olduğunu yoxlayın.
+### ⚠️ Port 5432 (session pooler) istifadə edin, 6543 yox
 
-Migration-ları uzaq bazaya tətbiq etmək:
+Supabase iki pooler portu verir və bu layihə üçün **yalnız 5432 uyğundur**:
+
+| Port | Rejim | Bu layihə üçün |
+|---|---|---|
+| **5432** | Session pooler | ✅ **Düzgün seçim** |
+| 6543 | Transaction pooler | ❌ İşləmir |
+
+**Səbəb:** transaction pooler hər tranzaksiyadan sonra server tərəfdəki bağlantını
+buraxır, amma Npgsql-in öz client-side pool-u həmin bağlantını "canlı" sayıb
+təkrar istifadə etməyə çalışır → sorğu cavabsız qalır və ~30 saniyədən sonra
+`Exception while reading from stream / Timeout during reading attempt` xətası verir.
+Bu, uzunömürlü server tətbiqlərində (bizim ASP.NET Core kimi) transaction pooler-in
+məlum uyğunsuzluğudur — 6543 daha çox serverless/edge funksiyalar üçündür.
+
+Ölçülmüş fərq (4 ardıcıl sorğu, eyni bağlantı sətri):
+
+```
+Port 5432 (session):     4/4 uğurlu, təkrar istifadə ~240ms
+Port 6543 (transaction): növbələşən uğur/timeout — hər pooled təkrar istifadə ilişir
+```
+
+### Migration-ları uzaq bazaya tətbiq etmək
+
 ```bash
 ASPNETCORE_ENVIRONMENT=Development dotnet ef database update -p src/MimeduAz.Infrastructure -s src/MimeduAz.Api
 ```
 (`ASPNETCORE_ENVIRONMENT=Development` user-secrets-in yüklənməsi üçün lazımdır —
 `dotnet ef` alətləri default olaraq `Production` mühitini fərz edir.)
+
+> Supabase-in pulsuz planında layihə uzun müddət istifadə olunmayanda "yuxuya"
+> keçir; ilk sorğu 2-4 saniyə çəkə bilər. Bağlantı sətrindəki `EnableRetryOnFailure`
+> (kodda) və `Keepalive=30` bunu yumşaldır.
 
 ---
 
@@ -352,11 +374,12 @@ detalları cavabda göstərilmir, yalnız loglanır.
 
 | Mövzu | Qərar | Səbəb |
 |---|---|---|
-| DB provideri | PostgreSQL əvəzinə **MySQL/MariaDB** | Layihə real Natro/Plesk hostinqinə bağlandı, orada MySQL/MariaDB 10.6 mövcuddur. |
-| `QuizQuestion.Options`, `BlogPost.Body` | `List<string>` → **`json`** sütun (dəyər çeviricisi ilə) | MySQL-də doğma massiv tipi yoxdur; `StringListJsonConverter` siyahını JSON mətnə çevirib saxlayır. |
+| DB provideri | **PostgreSQL (Supabase)** | Natro/Plesk MySQL-i Render-dən əlçatan deyildi: Plesk yalnız 5 sabit IP-yə icazə verir, Render-in çıxış IP-si isə 2×/24 aralıqda dəyişkəndir. Supabase IP whitelist tələb etmir. |
+| Supabase pooler portu | **5432** (session), 6543 yox | Transaction pooler Npgsql-in client-side pool-u ilə uyğun gəlmir — pooled bağlantının təkrar istifadəsi timeout verir. |
+| `QuizQuestion.Options`, `BlogPost.Body` | `jsonb` əvəzinə **`text[]`** | Npgsql `List<string>`-i birbaşa `jsonb` parametrinə yaza bilmir; `text[]` doğma massivdir və sorğulana bilir. |
 | Səbət | Yalnız daxil olmuş istifadəçi üçün | Spesifikasiya qonaq səbətini opsional saxlamışdı. `Cart.UserId` nullable qalıb — gələcəkdə guest səbəti üçün struktur hazırdır. |
 | Blog CRUD | Admin üçün `POST`/`PUT`/`DELETE` əlavə edildi | Spesifikasiyanın 1-ci bölməsi "sadə CMS-style CRUD" tələb edirdi; 4.8-də yalnız GET sadalanmışdı. |
-| Local dev DB portu | 3307 (Docker) | Maşında artıq işləyən başqa MySQL/MariaDB instansı ilə toqquşmasın deyə. |
+| Local dev DB portu | 5434 (Docker) | Maşında artıq işləyən başqa PostgreSQL instansı ilə toqquşmasın deyə. |
 | Sifariş sətrində komissiya | `CommissionAmount` + `AuthorPayoutAmount` sətir səviyyəsində snapshot kimi saxlanılır | Komissiya faizi sonradan dəyişsə də keçmiş sifarişlərin hesabatı sabit qalır. |
 | `Resource.RejectionReason` | Əlavə sahə | Moderasiya rəddinin səbəbini müəllifə göstərmək üçün. |
 | Fayl yükləmə | Fayl `Pending` mərhələsində də diskə yazılır | Admin təsdiqləməzdən əvvəl materialı yoxlaya bilsin deyə. |
@@ -411,9 +434,7 @@ silib deploy etsəniz, Swagger yenidən bağlanır (`Production`-da defolt davra
   yüklənmiş resurslar itəcək. Real istifadə üçün ya Render-in **Persistent Disk**
   add-on-unu qoşun, ya da `IFileStorageService`-in yeni bir implementasiyasını
   (S3/Azure Blob) yazın — interfeys artıq bu keçidə hazırdır.
-- Uzaq MySQL bazasına (Plesk/Natro) Render-dən qoşulmaq üçün Render-in çıxış
-  IP-ləri də (və ya `%` wildcard) Plesk-in `Remote MySQL Access` siyahısına
-  əlavə olunmalıdır — əks halda `Access denied` xətası alınar.
+- Supabase IP whitelist tələb etmir, ona görə Render-dən əlavə şəbəkə konfiqurasiyası lazım deyil.
 - Local `docker build .` ilə image-i yükləmədən əvvəl yoxlaya bilərsiniz:
   ```bash
   docker build -t mimedu-api .

@@ -193,14 +193,18 @@ public sealed class AdminService : IAdminService
             q = q.Where(l => l.StatusCode >= 400);
         }
 
+        // Query string-dən gələn tarixdə "Z" yoxdursa Kind=Unspecified olur və Npgsql
+        // onu timestamptz sütunu ilə müqayisə edə bilmir - UTC kimi normallaşdırırıq.
         if (query.From is not null)
         {
-            q = q.Where(l => l.CreatedAt >= query.From);
+            var from = ToUtc(query.From.Value);
+            q = q.Where(l => l.CreatedAt >= from);
         }
 
         if (query.To is not null)
         {
-            q = q.Where(l => l.CreatedAt <= query.To);
+            var to = ToUtc(query.To.Value);
+            q = q.Where(l => l.CreatedAt <= to);
         }
 
         var page = Math.Max(1, query.Page);
@@ -225,6 +229,13 @@ public sealed class AdminService : IAdminService
             TotalCount = total
         };
     }
+
+    private static DateTime ToUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+    };
 
     private async Task<Domain.Entities.Resource> LoadForModerationAsync(Guid resourceId, CancellationToken ct) =>
         await _db.Resources

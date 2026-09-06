@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using MimeduAz.Domain.Entities;
-using MimeduAz.Infrastructure.Persistence.Conversions;
 
 namespace MimeduAz.Infrastructure.Persistence.Configurations;
 
@@ -43,10 +42,8 @@ public sealed class QuizQuestionConfiguration : IEntityTypeConfiguration<QuizQue
 
         builder.Property(q => q.QuestionText).IsRequired().HasMaxLength(500);
 
-        // MySQL-də doğma massiv tipi yoxdur - variantlar JSON mətn sütununda saxlanılır.
-        builder.Property(q => q.Options)
-            .HasConversion(StringListJsonConverter.Converter, StringListJsonConverter.Comparer)
-            .HasColumnType("json");
+        // Variantlar Postgres-in doğma text[] massivində saxlanılır.
+        builder.Property(q => q.Options).HasColumnType("text[]");
 
         builder.HasIndex(q => new { q.QuizId, q.OrderIndex });
     }

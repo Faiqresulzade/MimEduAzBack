@@ -26,10 +26,16 @@ public static class DependencyInjection
                 "\"ConnectionStrings:DefaultConnection\" konfiqurasiyası tapılmadı.");
 
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseMySql(
-                connectionString,
-                ServerVersion.AutoDetect(connectionString),
-                mysql => mysql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+
+                // Supabase-in transaction pooler-i (port 6543) qısa müddətli kəsilmələr verə bilir.
+                npgsql.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorCodesToAdd: null);
+            }));
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
