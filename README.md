@@ -312,6 +312,53 @@ detalları cavabda göstərilmir, yalnız loglanır.
 
 ---
 
+## Render-də deploy
+
+Layihə **.NET**-dir, Node.js yox — Render-in defolt `yarn` / `yarn start` sahələri
+bura aid deyil. **Dockerfile ilə deploy edin:**
+
+1. Render-də **New → Web Service** yaradın, bu repo-nu seçin.
+2. **Language/Environment** sahəsində **Docker** seçin (Node yox). Bu seçim
+   Build/Start Command sahələrini tamamilə gizlədir — Render kök qovluqdakı
+   `Dockerfile`-ı avtomatik tapıb istifadə edir, əlavə heç nə yazmağa ehtiyac yoxdur.
+3. **Environment Variables** bölməsində aşağıdakıları əlavə edin (`__` iki alt xətt
+   ilə nested konfiqurasiya ayrılır — ASP.NET Core-un standart qaydasıdır):
+
+   | Açar | Nümunə dəyər |
+   |---|---|
+   | `ConnectionStrings__DefaultConnection` | `server=<host>;port=3306;database=<db>;user=<user>;password=<parol>;` |
+   | `Jwt__Issuer` | `https://<render-service-adı>.onrender.com` |
+   | `Jwt__Audience` | frontend-in domeni, məs. `https://mimedu.az` |
+   | `Jwt__SecretKey` | ən azı 32 simvollu təsadüfi mətn |
+   | `Cors__AllowedOrigins__0` | frontend-in tam origin-i (CORS üçün) |
+
+   `PORT` dəyişənini Render özü avtomatik verir — əlavə etməyə ehtiyac yoxdur,
+   `Dockerfile`-dakı `ENTRYPOINT` onu oxuyub `--urls` ilə bağlayır.
+
+4. `ASPNETCORE_ENVIRONMENT` təyin etməsəniz Render defolt olaraq `Production`
+   göndərir — bu, düzgün davranışdır: migration avtomatik tətbiq olunur, seed
+   data (demo istifadəçilər) **yaradılmır**, Swagger UI **bağlıdır**.
+
+**Diqqət ediləcək məqamlar:**
+- **Fayl yükləmə ephemeral disk üzərindədir.** Render-in pulsuz/standart planında
+  konteynerin fayl sistemi hər yeni deploy-da sıfırlanır — `wwwroot/uploads/resources`-a
+  yüklənmiş resurslar itəcək. Real istifadə üçün ya Render-in **Persistent Disk**
+  add-on-unu qoşun, ya da `IFileStorageService`-in yeni bir implementasiyasını
+  (S3/Azure Blob) yazın — interfeys artıq bu keçidə hazırdır.
+- Uzaq MySQL bazasına (Plesk/Natro) Render-dən qoşulmaq üçün Render-in çıxış
+  IP-ləri də (və ya `%` wildcard) Plesk-in `Remote MySQL Access` siyahısına
+  əlavə olunmalıdır — əks halda `Access denied` xətası alınar.
+- Local `docker build .` ilə image-i yükləmədən əvvəl yoxlaya bilərsiniz:
+  ```bash
+  docker build -t mimedu-api .
+  docker run -p 8080:8080 \
+    -e ConnectionStrings__DefaultConnection="..." \
+    -e Jwt__SecretKey="..." -e Jwt__Issuer="..." -e Jwt__Audience="..." \
+    mimedu-api
+  ```
+
+---
+
 ## Növbəti mərhələ
 
 Frontend (React + Vite + TypeScript + Tailwind) — mövcud UI prototipinin bu API-yə

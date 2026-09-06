@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -114,6 +115,18 @@ builder.Services.AddSwaggerWithJwt();
 
 var app = builder.Build();
 
+// Render/Heroku/Railway kimi platformalarda TLS bir kənar proksidə bitir və tətbiqə
+// HTTP kimi çatır. Bu middleware olmadan UseHttpsRedirection sonsuz yönləndirmə
+// döngüsü yaradır - proksi https-i "bilmir", həmişə http-dən https-ə yönləndirir.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+};
+// Bulud proksisinin IP-si sabit deyil - default məhdudiyyəti təmizləyirik.
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
 app.UseExceptionHandling();
 app.UseSerilogRequestLogging();
 
@@ -138,14 +151,19 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Migration hər mühitdə tətbiq olunur ki, production-da yeni migration üçün əl ilə
+// müdaxilə lazım olmasın. Seed data isə yalnız Development-da - demo istifadəçi/
+// resurslar production bazasına düşməsin.
+await ApplyMigrationsAsync(app);
+
 if (app.Environment.IsDevelopment())
 {
-    await ApplyMigrationsAndSeedAsync(app);
+    await SeedDevelopmentDataAsync(app);
 }
 
 app.Run();
 
-static async Task ApplyMigrationsAndSeedAsync(WebApplication app)
+static async Task ApplyMigrationsAsync(WebApplication app)
 {
     using var scope = app.Services.CreateScope();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
@@ -154,14 +172,27 @@ static async Task ApplyMigrationsAndSeedAsync(WebApplication app)
     {
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await db.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        // Bazaya çıxış yoxdursa tətbiq yenə də qalxsın - Swagger və konfiqurasiya yoxlanıla bilsin.
+        logger.LogError(ex, "Migration mərhələsi uğursuz oldu. Verilənlər bazası əlçatandırmı?");
+    }
+}
 
+static async Task SeedDevelopmentDataAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
         var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
         await seeder.SeedAsync();
     }
     catch (Exception ex)
     {
-        // Bazaya çıxış yoxdursa tətbiq yenə də qalxsın - Swagger və konfiqurasiya yoxlanıla bilsin.
-        logger.LogError(ex, "Migration/seed mərhələsi uğursuz oldu. Verilənlər bazası əlçatandırmı?");
+        logger.LogError(ex, "Seed mərhələsi uğursuz oldu.");
     }
 }
 

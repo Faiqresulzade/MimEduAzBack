@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/wwwroot/uploads/resources/*
+!**/wwwroot/uploads/resources/.gitkeep
+tests/
+scripts/
+*.md
+docker-compose.yml
+requests.http
+.git/
+.gitignore
