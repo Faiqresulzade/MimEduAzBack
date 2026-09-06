@@ -1,6 +1,6 @@
 namespace MimeduAz.Domain.Entities;
 
-/// <summary>Quiz sualı. Variantlar jsonb sütununda saxlanılır.</summary>
+/// <summary>Quiz sualı. Variantlar JSON sütununda saxlanılır (MySQL - massiv tipi olmadığı üçün).</summary>
 public class QuizQuestion
 {
     public Guid Id { get; set; } = Guid.NewGuid();

@@ -68,7 +68,7 @@ public sealed class ResourceService : IResourceService
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            // Provayderdən asılı olmasın deyə ToLower/Contains istifadə olunur (Npgsql ILIKE-a çevirir).
+            // Provayderdən asılı olmasın deyə ToLower/Contains istifadə olunur.
             var term = query.Search.Trim().ToLower();
             q = q.Where(r => r.Name.ToLower().Contains(term));
         }

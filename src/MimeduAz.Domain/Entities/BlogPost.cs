@@ -13,7 +13,7 @@ public class BlogPost
 
     public string Excerpt { get; set; } = string.Empty;
 
-    /// <summary>Paraqraflar. jsonb sütununda saxlanılır.</summary>
+    /// <summary>Paraqraflar. JSON sütununda saxlanılır (MySQL - massiv tipi olmadığı üçün).</summary>
     public List<string> Body { get; set; } = new();
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
