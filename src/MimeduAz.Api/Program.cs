@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
 using MimeduAz.Api.Middleware;
 using MimeduAz.Api.Services;
 using MimeduAz.Api.Swagger;
@@ -126,6 +127,29 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 forwardedHeadersOptions.KnownNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
+
+// API cavabları keşlənməməlidir. Əks halda CORS başlığı olmadan alınmış köhnə cavab
+// (məs. CORS konfiqurasiyasından əvvəl, ya da Origin başlığı olmayan sorğudan)
+// brauzer/CDN keşində qalır və sonrakı cross-origin sorğularda təkrar istifadə olunub
+// "CORS xətası" kimi görünür. Cavablar həm də istifadəçiyə xas olduğu üçün (JWT)
+// heç bir halda paylaşılan keşdə saxlanılmamalıdır.
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api"))
+    {
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            context.Response.Headers.Pragma = "no-cache";
+
+            // Keş yenə də saxlasa belə, cavabı Origin-ə görə ayırsın.
+            context.Response.Headers.Append(HeaderNames.Vary, HeaderNames.Origin);
+            return Task.CompletedTask;
+        });
+    }
+
+    await next();
+});
 
 // Audit log ən kənarda dayanır ki, ExceptionHandlingMiddleware xətanı 401/404/409-a
 // çevirdikdən SONRA yekun status kodunu və cavab gövdəsini görsün.
