@@ -1,0 +1,27 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+*.DotSettings.user
+
+## Yüklənmiş fayllar (development)
+src/MimeduAz.Api/wwwroot/uploads/resources/*
+!src/MimeduAz.Api/wwwroot/uploads/resources/.gitkeep
+
+## Sirlər — heç vaxt commit edilməsin
+appsettings.Production.json
+appsettings.*.local.json
+*.env
+.env
+
+## Test nəticələri
+TestResults/
+coverage*.json
+coverage*.xml
+
+## OS
+Thumbs.db
+.DS_Store

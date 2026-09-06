@@ -1,0 +1,64 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{88C11614-7835-4912-95D8-9776A7B343E9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeduAz.Api", "src\MimeduAz.Api\MimeduAz.Api.csproj", "{8577AABA-9366-40A7-A54C-9E61BBA6F6D9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeduAz.Domain", "src\MimeduAz.Domain\MimeduAz.Domain.csproj", "{C98E8EFB-F981-4C78-81C3-B44437BEA518}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeduAz.Application", "src\MimeduAz.Application\MimeduAz.Application.csproj", "{650A7175-2517-4102-8367-0B0B8DEEF4A0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeduAz.Infrastructure", "src\MimeduAz.Infrastructure\MimeduAz.Infrastructure.csproj", "{848FF191-7189-4B51-95C0-88F23B27791C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeduAz.Contracts", "src\MimeduAz.Contracts\MimeduAz.Contracts.csproj", "{1AD4EF4B-802F-4E91-9FA4-A010F369CD3B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{432B7937-690F-4F91-B7A1-11FE1C4E4CE9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MimeduAz.Tests", "tests\MimeduAz.Tests\MimeduAz.Tests.csproj", "{F61F8F42-CC50-4CEE-B000-700E56576B7E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8577AABA-9366-40A7-A54C-9E61BBA6F6D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8577AABA-9366-40A7-A54C-9E61BBA6F6D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8577AABA-9366-40A7-A54C-9E61BBA6F6D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8577AABA-9366-40A7-A54C-9E61BBA6F6D9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C98E8EFB-F981-4C78-81C3-B44437BEA518}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C98E8EFB-F981-4C78-81C3-B44437BEA518}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C98E8EFB-F981-4C78-81C3-B44437BEA518}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C98E8EFB-F981-4C78-81C3-B44437BEA518}.Release|Any CPU.Build.0 = Release|Any CPU
+		{650A7175-2517-4102-8367-0B0B8DEEF4A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{650A7175-2517-4102-8367-0B0B8DEEF4A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{650A7175-2517-4102-8367-0B0B8DEEF4A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{650A7175-2517-4102-8367-0B0B8DEEF4A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{848FF191-7189-4B51-95C0-88F23B27791C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{848FF191-7189-4B51-95C0-88F23B27791C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{848FF191-7189-4B51-95C0-88F23B27791C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{848FF191-7189-4B51-95C0-88F23B27791C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1AD4EF4B-802F-4E91-9FA4-A010F369CD3B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1AD4EF4B-802F-4E91-9FA4-A010F369CD3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1AD4EF4B-802F-4E91-9FA4-A010F369CD3B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1AD4EF4B-802F-4E91-9FA4-A010F369CD3B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F61F8F42-CC50-4CEE-B000-700E56576B7E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F61F8F42-CC50-4CEE-B000-700E56576B7E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F61F8F42-CC50-4CEE-B000-700E56576B7E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F61F8F42-CC50-4CEE-B000-700E56576B7E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{8577AABA-9366-40A7-A54C-9E61BBA6F6D9} = {88C11614-7835-4912-95D8-9776A7B343E9}
+		{C98E8EFB-F981-4C78-81C3-B44437BEA518} = {88C11614-7835-4912-95D8-9776A7B343E9}
+		{650A7175-2517-4102-8367-0B0B8DEEF4A0} = {88C11614-7835-4912-95D8-9776A7B343E9}
+		{848FF191-7189-4B51-95C0-88F23B27791C} = {88C11614-7835-4912-95D8-9776A7B343E9}
+		{1AD4EF4B-802F-4E91-9FA4-A010F369CD3B} = {88C11614-7835-4912-95D8-9776A7B343E9}
+		{F61F8F42-CC50-4CEE-B000-700E56576B7E} = {432B7937-690F-4F91-B7A1-11FE1C4E4CE9}
+	EndGlobalSection
+EndGlobal

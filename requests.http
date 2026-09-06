@@ -1,0 +1,484 @@
+###############################################################################
+# MIMEDU.AZ — API manual test faylı
+#
+# İstifadə (VS Code "REST Client" və ya JetBrains HTTP Client):
+#   1. docker compose up -d
+#   2. dotnet run --project src/MimeduAz.Api
+#   3. Aşağıdakı sorğuları yuxarıdan aşağı "Send Request" ilə icra edin.
+#
+# Seed hesabları:
+#   admin@mimedu.az  / Admin123!    (Admin)
+#   nigar@mimedu.az  / Teacher123!  (Teacher, 2 resurs müəllifi)
+#   elvin@mimedu.az  / Teacher123!  (Teacher)
+#
+# QEYD: Checkout demo rejimdədir — heç bir kart məlumatı göndərilmir və qəbul edilmir.
+###############################################################################
+
+@baseUrl = http://localhost:5297
+@contentType = application/json
+
+# Seed-dəki sabit id-lər (DataSeeder.Ids)
+@resFractions = 33333333-3333-3333-3333-333333333331
+@resGeometry  = 33333333-3333-3333-3333-333333333332
+@resPhysics   = 33333333-3333-3333-3333-333333333333
+@resEnglish   = 33333333-3333-3333-3333-333333333336
+@trainAi      = 44444444-4444-4444-4444-444444444441
+@trainVideo   = 44444444-4444-4444-4444-444444444443
+@quizFractions = 55555555-5555-5555-5555-555555555551
+@nigarId      = 22222222-2222-2222-2222-222222222221
+
+
+###############################################################################
+# 1. AUTH
+###############################################################################
+
+### 1.1 Yeni müəllim qeydiyyatı
+# @name register
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: {{contentType}}
+
+{
+  "fullName": "Test Müəllim",
+  "email": "test.muellim@mimedu.az",
+  "password": "Test1234",
+  "subject": "Kimya"
+}
+
+### 1.2 Müəllim girişi (seed hesabı)
+# @name teacherLogin
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "nigar@mimedu.az",
+  "password": "Teacher123!"
+}
+
+@teacherToken = {{teacherLogin.response.body.accessToken}}
+@teacherRefresh = {{teacherLogin.response.body.refreshToken}}
+
+### 1.3 Admin girişi
+# @name adminLogin
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@mimedu.az",
+  "password": "Admin123!"
+}
+
+@adminToken = {{adminLogin.response.body.accessToken}}
+
+### 1.4 Cari istifadəçi
+GET {{baseUrl}}/api/v1/auth/me
+Authorization: Bearer {{teacherToken}}
+
+### 1.5 Access token-i yenilə (refresh rotasiya olunur)
+# @name refresh
+POST {{baseUrl}}/api/v1/auth/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{teacherRefresh}}"
+}
+
+### 1.6 Çıxış (refresh token ləğv olunur)
+POST {{baseUrl}}/api/v1/auth/logout
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refresh.response.body.refreshToken}}"
+}
+
+### 1.7 Səhv şifrə — 401 gözlənilir
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "nigar@mimedu.az",
+  "password": "yanlis-sifre"
+}
+
+### 1.8 Zəif şifrə ilə qeydiyyat — 400 + validasiya xətaları gözlənilir
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: {{contentType}}
+
+{
+  "fullName": "Zəif Şifrə",
+  "email": "zeif@mimedu.az",
+  "password": "123"
+}
+
+
+###############################################################################
+# 2. RESURSLAR
+###############################################################################
+
+### 2.1 Bütün təsdiqlənmiş resurslar
+GET {{baseUrl}}/api/v1/resources
+
+### 2.2 Fənn və sinif üzrə filtr
+GET {{baseUrl}}/api/v1/resources?subject=Riyaziyyat&grade=5
+
+### 2.3 Yalnız pulsuz resurslar + axtarış + səhifələmə
+GET {{baseUrl}}/api/v1/resources?isPaid=false&search=iş&page=1&pageSize=10
+
+### 2.4 Resursun detalları
+GET {{baseUrl}}/api/v1/resources/{{resFractions}}
+
+### 2.5 Pulsuz resursu endir (endirmə sayı artır)
+POST {{baseUrl}}/api/v1/resources/{{resFractions}}/download
+
+### 2.6 Ödənişli resursu satın almadan endirmə cəhdi — 401/403 gözlənilir
+POST {{baseUrl}}/api/v1/resources/{{resPhysics}}/download
+Authorization: Bearer {{teacherToken}}
+
+### 2.7 Yeni resurs yüklə (multipart/form-data)
+# Fayl yolunu öz sisteminizdəki mövcud PDF/DOCX/PPTX ilə əvəz edin.
+POST {{baseUrl}}/api/v1/resources
+Authorization: Bearer {{teacherToken}}
+Content-Type: multipart/form-data; boundary=MimeduBoundary
+
+--MimeduBoundary
+Content-Disposition: form-data; name="Name"
+
+Onluq kəsrlər — yeni iş vərəqi
+--MimeduBoundary
+Content-Disposition: form-data; name="Subject"
+
+Riyaziyyat
+--MimeduBoundary
+Content-Disposition: form-data; name="Grade"
+
+5
+--MimeduBoundary
+Content-Disposition: form-data; name="Type"
+
+WorkSheet
+--MimeduBoundary
+Content-Disposition: form-data; name="IsPaid"
+
+false
+--MimeduBoundary
+Content-Disposition: form-data; name="Price"
+
+0
+--MimeduBoundary
+Content-Disposition: form-data; name="file"; filename="numune.pdf"
+Content-Type: application/pdf
+
+< ./samples/numune.pdf
+--MimeduBoundary--
+
+### 2.8 Mənim resurslarım (bütün statuslar)
+GET {{baseUrl}}/api/v1/resources/mine
+Authorization: Bearer {{teacherToken}}
+
+### 2.9 Müəllifin ictimai profili
+GET {{baseUrl}}/api/v1/resources/author/{{nigarId}}
+
+
+###############################################################################
+# 3. TƏLİMLƏR
+###############################################################################
+
+### 3.1 Bütün təlimlər
+GET {{baseUrl}}/api/v1/trainings
+
+### 3.2 Təlimin detalları və proqramı
+GET {{baseUrl}}/api/v1/trainings/{{trainAi}}
+
+### 3.3 Yeni təlim yarat (yalnız Admin)
+POST {{baseUrl}}/api/v1/trainings
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Rəqəmsal alətlərlə differensiasiya",
+  "format": "Online",
+  "description": "Fərqli səviyyəli şagirdlər üçün rəqəmsal alətlərlə tapşırıq differensiasiyası.",
+  "price": 60,
+  "durationHours": 10,
+  "metaLabel": "5 sessiya",
+  "seatLimit": null,
+  "syllabus": [
+    "Differensiasiyanın əsasları",
+    "Rəqəmsal alətlərin seçimi",
+    "Tapşırıq bankının qurulması",
+    "Nəticələrin izlənməsi"
+  ]
+}
+
+### 3.4 Müəllim təlim yaratmağa çalışır — 403 gözlənilir
+POST {{baseUrl}}/api/v1/trainings
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "İcazəsiz təlim",
+  "format": "Video",
+  "description": "Bu sorğu rədd edilməlidir.",
+  "price": 10,
+  "durationHours": 2,
+  "metaLabel": "2 dərs",
+  "syllabus": []
+}
+
+### 3.5 Mənim təlimlərim
+GET {{baseUrl}}/api/v1/trainings/mine
+Authorization: Bearer {{teacherToken}}
+
+
+###############################################################################
+# 4. SƏBƏT VƏ SİFARİŞ (demo ödəniş)
+###############################################################################
+
+### 4.1 Səbətə ödənişli resurs əlavə et
+# Qeyd: nigar@mimedu.az bu resursun müəllifidir, ona görə elvin@ ilə giriş edin
+# və ya aşağıdakı @teacherToken-i elvin-in token-i ilə əvəz edin.
+POST {{baseUrl}}/api/v1/cart/items
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "itemType": "Resource",
+  "itemId": "{{resPhysics}}"
+}
+
+### 4.2 Səbətə təlim əlavə et
+POST {{baseUrl}}/api/v1/cart/items
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "itemType": "Training",
+  "itemId": "{{trainVideo}}"
+}
+
+### 4.3 Pulsuz resursu səbətə əlavə etmə cəhdi — 400 gözlənilir
+POST {{baseUrl}}/api/v1/cart/items
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "itemType": "Resource",
+  "itemId": "{{resFractions}}"
+}
+
+### 4.4 Səbətə bax
+# @name cart
+GET {{baseUrl}}/api/v1/cart
+Authorization: Bearer {{teacherToken}}
+
+### 4.5 Səbətdən sətri sil
+DELETE {{baseUrl}}/api/v1/cart/items/{{cart.response.body.items[0].id}}
+Authorization: Bearer {{teacherToken}}
+
+### 4.6 Checkout — demo ödəniş, kart məlumatı YOXDUR
+POST {{baseUrl}}/api/v1/orders/checkout
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "customerName": "Nigar Əliyeva"
+}
+
+### 4.7 Sifariş tarixçəm
+GET {{baseUrl}}/api/v1/orders/mine
+Authorization: Bearer {{teacherToken}}
+
+### 4.8 Satın alınmış ödənişli resursu endir — indi işləməlidir
+POST {{baseUrl}}/api/v1/resources/{{resPhysics}}/download
+Authorization: Bearer {{teacherToken}}
+
+
+###############################################################################
+# 5. İMTAHAN (QUIZ)
+###############################################################################
+
+### 5.1 Resursun imtahan metadata-sı
+GET {{baseUrl}}/api/v1/resources/{{resFractions}}/quiz
+
+### 5.2 İmtahan suallarını gətir (correctOptionIndex qaytarılmır!)
+GET {{baseUrl}}/api/v1/quiz/{{quizFractions}}/questions
+Authorization: Bearer {{teacherToken}}
+
+### 5.3 Öz resursum üçün imtahan yarat / sual əlavə et
+POST {{baseUrl}}/api/v1/resources/{{resGeometry}}/quiz
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "passPercent": 70,
+  "mode": "replace",
+  "questions": [
+    {
+      "questionText": "Üçbucağın daxili bucaqlarının cəmi neçə dərəcədir?",
+      "options": ["90", "180", "270", "360"],
+      "correctOptionIndex": 1
+    },
+    {
+      "questionText": "Kvadratın neçə simmetriya oxu var?",
+      "options": ["2", "3", "4", "6"],
+      "correctOptionIndex": 2
+    }
+  ]
+}
+
+### 5.4 Başqasının resursu üçün imtahan yaratma cəhdi — 403 gözlənilir
+POST {{baseUrl}}/api/v1/resources/{{resPhysics}}/quiz
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "passPercent": 70,
+  "mode": "append",
+  "questions": [
+    {
+      "questionText": "Test sualı",
+      "options": ["A", "B"],
+      "correctOptionIndex": 0
+    }
+  ]
+}
+
+### 5.5 İmtahanı ver — hamısı düzgün, sertifikat avtomatik verilir
+# questionId-ləri 5.2-nin cavabından götürüb aşağıya yerləşdirin.
+POST {{baseUrl}}/api/v1/quiz/{{quizFractions}}/submit
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "answers": [
+    { "questionId": "QUESTION_ID_1", "selectedIndex": 1 },
+    { "questionId": "QUESTION_ID_2", "selectedIndex": 2 },
+    { "questionId": "QUESTION_ID_3", "selectedIndex": 0 },
+    { "questionId": "QUESTION_ID_4", "selectedIndex": 1 }
+  ]
+}
+
+
+###############################################################################
+# 6. SERTİFİKATLAR
+###############################################################################
+
+### 6.1 Sertifikatı kod ilə doğrula (PUBLİK — token lazım deyil)
+GET {{baseUrl}}/api/v1/certificates/verify/MIM-2026-4417
+
+### 6.2 Mövcud olmayan kod — isValid: false gözlənilir
+GET {{baseUrl}}/api/v1/certificates/verify/MIM-2026-0000
+
+### 6.3 Mənim sertifikatlarım
+GET {{baseUrl}}/api/v1/certificates/mine
+Authorization: Bearer {{teacherToken}}
+
+### 6.4 Əl ilə sertifikat ver (yalnız Admin)
+POST {{baseUrl}}/api/v1/certificates/issue
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "userFullName": "Elvin Məmmədov",
+  "trainingId": "{{trainAi}}"
+}
+
+
+###############################################################################
+# 7. ADMIN PANEL
+###############################################################################
+
+### 7.1 Moderasiya növbəsi
+GET {{baseUrl}}/api/v1/admin/resources/pending
+Authorization: Bearer {{adminToken}}
+
+### 7.2 Resursu təsdiqlə
+POST {{baseUrl}}/api/v1/admin/resources/{{resEnglish}}/approve
+Authorization: Bearer {{adminToken}}
+
+### 7.3 Resursu rədd et
+POST {{baseUrl}}/api/v1/admin/resources/{{resEnglish}}/reject
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "reason": "Materialın mətnində orfoqrafik səhvlər var, düzəldib yenidən göndərin."
+}
+
+### 7.4 Bütün istifadəçilər və statistikaları
+GET {{baseUrl}}/api/v1/admin/users
+Authorization: Bearer {{adminToken}}
+
+### 7.5 Satış xülasəsi (GMV, komissiya, müəllif payı)
+GET {{baseUrl}}/api/v1/admin/sales
+Authorization: Bearer {{adminToken}}
+
+### 7.6 Bütün sifarişlər
+GET {{baseUrl}}/api/v1/admin/orders
+Authorization: Bearer {{adminToken}}
+
+### 7.7 Müəllim admin endpoint-inə müraciət edir — 403 gözlənilir
+GET {{baseUrl}}/api/v1/admin/users
+Authorization: Bearer {{teacherToken}}
+
+
+###############################################################################
+# 8. BLOG
+###############################################################################
+
+### 8.1 Bütün yazılar
+# @name blog
+GET {{baseUrl}}/api/v1/blog
+
+### 8.2 Yazının tam mətni
+GET {{baseUrl}}/api/v1/blog/{{blog.response.body.$[0].id}}
+
+### 8.3 Yeni yazı əlavə et (yalnız Admin)
+# @name newPost
+POST {{baseUrl}}/api/v1/blog
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "title": "Rəqəmsal alətlərlə ev tapşırığı",
+  "tag": "Metodika",
+  "readTime": "5 dəq",
+  "excerpt": "Ev tapşırığını maraqlı və ölçülə bilən etməyin yolları.",
+  "body": [
+    "Ev tapşırığının məqsədi təkrar deyil, möhkəmləndirmədir.",
+    "Rəqəmsal alətlər avtomatik yoxlama ilə müəllimin vaxtını qoruyur.",
+    "Nəticələri növbəti dərsin planlaşdırılmasında istifadə edin."
+  ]
+}
+
+### 8.4 Yazını yenilə (yalnız Admin)
+PUT {{baseUrl}}/api/v1/blog/{{newPost.response.body.id}}
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "title": "Rəqəmsal alətlərlə ev tapşırığı (yenilənmiş)",
+  "tag": "Metodika",
+  "readTime": "6 dəq",
+  "excerpt": "Ev tapşırığını maraqlı və ölçülə bilən etməyin yolları.",
+  "body": [
+    "Ev tapşırığının məqsədi təkrar deyil, möhkəmləndirmədir.",
+    "Nəticələri növbəti dərsin planlaşdırılmasında istifadə edin."
+  ]
+}
+
+### 8.5 Yazını sil (yalnız Admin)
+DELETE {{baseUrl}}/api/v1/blog/{{newPost.response.body.id}}
+Authorization: Bearer {{adminToken}}
+
+### 8.6 Müəllim blog yazısı əlavə etməyə çalışır — 403 gözlənilir
+POST {{baseUrl}}/api/v1/blog
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "title": "İcazəsiz yazı",
+  "tag": "Test",
+  "readTime": "1 dəq",
+  "excerpt": "Bu sorğu rədd edilməlidir.",
+  "body": ["Mətn"]
+}
