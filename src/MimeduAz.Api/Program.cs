@@ -130,7 +130,11 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 app.UseExceptionHandling();
 app.UseSerilogRequestLogging();
 
-if (app.Environment.IsDevelopment())
+// Swagger defolt olaraq yalnız Development-də açıqdır. "Swagger:Enabled" konfiqurasiyası
+// ilə mühiti dəyişmədən (yəni seed/JWT/CORS dev tənzimləmələrini toxunmadan) production-da
+// da açıla bilər - məs. Render-də Swagger__Enabled=true environment variable-ı ilə.
+var swaggerEnabled = app.Configuration.GetValue<bool?>("Swagger:Enabled") ?? app.Environment.IsDevelopment();
+if (swaggerEnabled)
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>

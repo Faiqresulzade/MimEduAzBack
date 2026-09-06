@@ -331,13 +331,28 @@ bura aid deyil. **Dockerfile ilə deploy edin:**
    | `Jwt__Audience` | frontend-in domeni, məs. `https://mimedu.az` |
    | `Jwt__SecretKey` | ən azı 32 simvollu təsadüfi mətn |
    | `Cors__AllowedOrigins__0` | frontend-in tam origin-i (CORS üçün) |
+   | `Swagger__Enabled` | `true` — Swagger UI-ni production-da da açır (opsional, aşağıya bax) |
 
    `PORT` dəyişənini Render özü avtomatik verir — əlavə etməyə ehtiyac yoxdur,
    `Dockerfile`-dakı `ENTRYPOINT` onu oxuyub `--urls` ilə bağlayır.
 
 4. `ASPNETCORE_ENVIRONMENT` təyin etməsəniz Render defolt olaraq `Production`
    göndərir — bu, düzgün davranışdır: migration avtomatik tətbiq olunur, seed
-   data (demo istifadəçilər) **yaradılmır**, Swagger UI **bağlıdır**.
+   data (demo istifadəçilər) **yaradılmır**, Swagger UI defolt olaraq **bağlıdır**.
+
+### Swagger-i production-da açmaq
+
+`ASPNETCORE_ENVIRONMENT=Development` etmək **tövsiyə olunmur** — bu, seed data-nı
+(demo istifadəçilər) yenidən yaradar və JWT/CORS-un dev tənzimləmələrini aktivləşdirər.
+Bunun əvəzinə mühiti toxunmadan yalnız Swagger-i açan ayrıca flag var:
+
+```
+Swagger__Enabled=true
+```
+
+Bunu Render-in Environment Variables-a əlavə edib yenidən deploy edin —
+`https://<service-adı>.onrender.com/swagger` açılacaq. Sınaqdan sonra dəyişəni
+silib deploy etsəniz, Swagger yenidən bağlanır (`Production`-da defolt davranış).
 
 **Diqqət ediləcək məqamlar:**
 - **Fayl yükləmə ephemeral disk üzərindədir.** Render-in pulsuz/standart planında
