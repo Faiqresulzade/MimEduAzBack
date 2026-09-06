@@ -8,6 +8,7 @@ using MimeduAz.Application.Common.Interfaces;
 using MimeduAz.Application.Common.Options;
 using MimeduAz.Domain.Entities;
 using MimeduAz.Infrastructure.Identity;
+using MimeduAz.Infrastructure.Logging;
 using MimeduAz.Infrastructure.Persistence;
 using MimeduAz.Infrastructure.Storage;
 
@@ -53,6 +54,11 @@ public static class DependencyInjection
             sp.GetRequiredService<ILogger<LocalFileStorageService>>()));
 
         services.AddScoped<DataSeeder>();
+
+        // Audit log: növbə singleton-dur, bazaya yazan servis arxa planda işləyir.
+        services.AddSingleton<RequestLogQueue>();
+        services.AddSingleton<IRequestLogSink>(sp => sp.GetRequiredService<RequestLogQueue>());
+        services.AddHostedService<RequestLogWriter>();
 
         return services;
     }

@@ -58,4 +58,38 @@ public sealed class AdminController : ControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<OrderDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<OrderDto>>> Orders(CancellationToken ct) =>
         Ok(await _admin.GetOrdersAsync(ct));
+
+    /// <summary>
+    /// HTTP audit log-u (bütün request/response qeydləri).
+    /// Şifrə və token kimi həssas sahələr yazılarkən maskalanır.
+    /// </summary>
+    [HttpGet("logs")]
+    [ProducesResponseType(typeof(PagedResult<RequestLogDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResult<RequestLogDto>>> Logs(
+        [FromQuery] string? method,
+        [FromQuery] string? path,
+        [FromQuery] int? statusCode,
+        [FromQuery] Guid? userId,
+        [FromQuery] bool? onlyErrors,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        var query = new RequestLogQuery
+        {
+            Method = method,
+            Path = path,
+            StatusCode = statusCode,
+            UserId = userId,
+            OnlyErrors = onlyErrors,
+            From = from,
+            To = to,
+            Page = page,
+            PageSize = pageSize
+        };
+
+        return Ok(await _admin.GetRequestLogsAsync(query, ct));
+    }
 }

@@ -6,6 +6,7 @@ using MimeduAz.Application.Common.Interfaces;
 using MimeduAz.Application.Common.Mappings;
 using MimeduAz.Application.Common.Options;
 using MimeduAz.Contracts.Admin;
+using MimeduAz.Contracts.Common;
 using MimeduAz.Contracts.Orders;
 using MimeduAz.Contracts.Resources;
 using MimeduAz.Domain.Enums;
@@ -159,6 +160,70 @@ public sealed class AdminService : IAdminService
             .ToListAsync(ct);
 
         return orders.Select(o => o.ToDto()).ToList();
+    }
+
+    public async Task<PagedResult<RequestLogDto>> GetRequestLogsAsync(RequestLogQuery query, CancellationToken ct)
+    {
+        var q = _db.RequestLogs.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(query.Method))
+        {
+            var method = query.Method.Trim().ToUpper();
+            q = q.Where(l => l.Method == method);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Path))
+        {
+            var path = query.Path.Trim().ToLower();
+            q = q.Where(l => l.Path.ToLower().Contains(path));
+        }
+
+        if (query.StatusCode is > 0)
+        {
+            q = q.Where(l => l.StatusCode == query.StatusCode);
+        }
+
+        if (query.UserId is not null)
+        {
+            q = q.Where(l => l.UserId == query.UserId);
+        }
+
+        if (query.OnlyErrors == true)
+        {
+            q = q.Where(l => l.StatusCode >= 400);
+        }
+
+        if (query.From is not null)
+        {
+            q = q.Where(l => l.CreatedAt >= query.From);
+        }
+
+        if (query.To is not null)
+        {
+            q = q.Where(l => l.CreatedAt <= query.To);
+        }
+
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 200);
+
+        var total = await q.CountAsync(ct);
+        var items = await q
+            .OrderByDescending(l => l.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedResult<RequestLogDto>
+        {
+            Items = items.Select(l => new RequestLogDto(
+                l.Id, l.TraceId, l.Method, l.Path, l.QueryString,
+                l.StatusCode, l.DurationMs, l.UserId, l.UserEmail,
+                l.IpAddress, l.UserAgent, l.RequestContentType,
+                l.RequestBody, l.ResponseBody, l.ExceptionType, l.CreatedAt)).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total
+        };
     }
 
     private async Task<Domain.Entities.Resource> LoadForModerationAsync(Guid resourceId, CancellationToken ct) =>

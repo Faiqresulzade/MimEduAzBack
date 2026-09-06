@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<CommissionOptions>(configuration.GetSection(CommissionOptions.SectionName));
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
+        services.Configure<RequestLogOptions>(configuration.GetSection(RequestLogOptions.SectionName));
 
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
 

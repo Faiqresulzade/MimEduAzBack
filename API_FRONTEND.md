@@ -380,6 +380,26 @@ Bütün endpoint-lər 🔒 yalnız Admin rolu.
 | `GET /admin/users` | `AdminUserDto[]` (aşağıda) |
 | `GET /admin/sales` | `SalesSummaryDto` (aşağıda) |
 | `GET /admin/orders` | `OrderDto[]` — bütün sifarişlər |
+| `GET /admin/logs` | `PagedResult<RequestLogDto>` — HTTP audit log (aşağıda) |
+
+**Audit log** (`GET /admin/logs`) — bütün API sorğularının tarixçəsi.
+Query: `method`, `path`, `statusCode`, `userId`, `onlyErrors`, `from`, `to`, `page`, `pageSize` (default 50, max 200).
+
+```ts
+// RequestLogDto
+{
+  id: number, traceId: string,
+  method: string, path: string, queryString: string | null,
+  statusCode: number, durationMs: number,
+  userId: string | null, userEmail: string | null,
+  ipAddress: string | null, userAgent: string | null,
+  requestContentType: string | null,
+  requestBody: string | null,    // şifrə/token sahələri "***" ilə maskalanıb
+  responseBody: string | null,   // eyni maskalama tətbiq olunur
+  exceptionType: string | null,
+  createdAt: string
+}
+```
 
 ```ts
 // AdminUserDto

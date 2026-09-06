@@ -482,3 +482,36 @@ Content-Type: {{contentType}}
   "excerpt": "Bu sorğu rədd edilməlidir.",
   "body": ["Mətn"]
 }
+
+
+###############################################################################
+# 9. AUDIT LOG (Admin) — bütün request/response qeydləri
+###############################################################################
+
+### 9.1 Son sorğular
+GET {{baseUrl}}/api/v1/admin/logs?pageSize=20
+Authorization: Bearer {{adminToken}}
+
+### 9.2 Yalnız xətalar (4xx/5xx)
+GET {{baseUrl}}/api/v1/admin/logs?onlyErrors=true&pageSize=50
+Authorization: Bearer {{adminToken}}
+
+### 9.3 Konkret status kodu üzrə
+GET {{baseUrl}}/api/v1/admin/logs?statusCode=401
+Authorization: Bearer {{adminToken}}
+
+### 9.4 Yol və metod üzrə filtr
+GET {{baseUrl}}/api/v1/admin/logs?method=POST&path=/auth/login
+Authorization: Bearer {{adminToken}}
+
+### 9.5 Konkret istifadəçinin fəaliyyəti
+GET {{baseUrl}}/api/v1/admin/logs?userId={{nigarId}}
+Authorization: Bearer {{adminToken}}
+
+### 9.6 Tarix aralığı
+GET {{baseUrl}}/api/v1/admin/logs?from=2026-09-01T00:00:00Z&to=2026-12-31T23:59:59Z
+Authorization: Bearer {{adminToken}}
+
+### 9.7 Müəllim audit log-a baxmağa çalışır — 403 gözlənilir
+GET {{baseUrl}}/api/v1/admin/logs
+Authorization: Bearer {{teacherToken}}

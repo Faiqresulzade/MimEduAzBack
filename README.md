@@ -190,6 +190,56 @@ ASPNETCORE_ENVIRONMENT=Development dotnet ef database update -p src/MimeduAz.Inf
 
 ---
 
+## HTTP audit log (request/response DB-də)
+
+Bütün API sorğuları və cavabları `request_logs` cədvəlinə yazılır: metod, yol, status,
+müddət, istifadəçi, IP, User-Agent və (maskalanmış) request/response gövdəsi.
+
+### Həssas məlumatların qorunması
+
+Bu, spesifikasiyanın *"heç bir şəxsi/həssas məlumat loglanmasın"* tələbi ilə
+toqquşduğu üçün gövdələr yazılmazdan əvvəl `SensitiveDataRedactor`-dan keçir:
+
+- Adında `password`, `token`, `secret`, `authorization`, `apikey`, `cardnumber`,
+  `cvc`, `cvv` olan **hər JSON sahəsi** (iç-içə obyektlər və massivlər daxil) `***` ilə əvəz olunur.
+- İstisna: `...ExpiresAt` / `...ExpiryMinutes` kimi vaxt sahələri oxunaqlı qalır — həssas deyil.
+- **JSON olmayan gövdələr tamamilə buraxılır** — tanınmayan formatda şifrənin gizli
+  qalacağına zəmanət yoxdur.
+- **Fayl yükləmələri (`multipart/*`) oxunmur** — yalnız `[tip, N bayt]` qeyd olunur
+  (25 MB-lıq faylı yaddaşa oxumamaq üçün).
+- Binary/qeyri-JSON cavablar da gövdəsiz qeyd olunur.
+
+Davranış 14 unit testlə (`SensitiveDataRedactorTests`) qorunur.
+
+### Performans
+
+Loglama sorğunu **ləngitmir**: qeydlər yaddaşdakı məhdud tutumlu növbəyə atılır,
+`RequestLogWriter` arxa plan servisi onları batch şəklində bazaya yazır.
+Növbə dolarsa ən köhnə qeyd atılır — log yazmaq üçün heç vaxt sorğu gözlədilmir və
+baza xətası sorğunu pozmur.
+
+### Konfiqurasiya (`appsettings.json` → `RequestLog`)
+
+| Açar | Default | Təyinat |
+|---|---|---|
+| `Enabled` | `true` | Loglamanı tamamilə söndürür |
+| `LogRequestBody` / `LogResponseBody` | `true` | Gövdələrin yazılması |
+| `MaxBodyLength` | `4000` | Gövdə bu uzunluqdan sonra kəsilir |
+| `ExcludedPathPrefixes` | `/swagger`, `/uploads`, `/health`, `/favicon.ico` | Loglanmayan yollar |
+| `QueueCapacity` | `2000` | Yaddaşdakı növbənin tutumu |
+| `BatchSize` / `FlushIntervalSeconds` | `50` / `5` | Bazaya yazma tezliyi |
+| `RetentionDays` | `30` | Bu gündən köhnə qeydlər avtomatik silinir (`0` = silmə) |
+
+### Loglara baxış
+
+```
+GET /api/v1/admin/logs?onlyErrors=true&pageSize=50
+```
+Filtrlər: `method`, `path`, `statusCode`, `userId`, `onlyErrors`, `from`, `to`,
+`page`, `pageSize`. Yalnız **Admin** rolu üçün.
+
+---
+
 ## Autentifikasiya
 
 - ASP.NET Core Identity (`IdentityDbContext<ApplicationUser, ApplicationRole, Guid>`).
@@ -265,6 +315,7 @@ Bütün endpoint-lər `/api/v1/` prefiksi ilə.
 | GET | `/admin/users` |
 | GET | `/admin/sales` |
 | GET | `/admin/orders` |
+| GET | `/admin/logs` |
 
 ### Blog
 | Metod | Yol | İcazə |

@@ -29,3 +29,22 @@ public sealed record SalesSummaryDto(
     decimal ResourceRevenue,
     decimal TrainingRevenue,
     decimal CommissionPercent);
+
+/// <summary>Audit log sətri (admin panelində sorğu tarixçəsi).</summary>
+public sealed record RequestLogDto(
+    long Id,
+    string TraceId,
+    string Method,
+    string Path,
+    string? QueryString,
+    int StatusCode,
+    int DurationMs,
+    Guid? UserId,
+    string? UserEmail,
+    string? IpAddress,
+    string? UserAgent,
+    string? RequestContentType,
+    string? RequestBody,
+    string? ResponseBody,
+    string? ExceptionType,
+    DateTime CreatedAt);

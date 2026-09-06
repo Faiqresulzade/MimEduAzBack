@@ -127,6 +127,11 @@ forwardedHeadersOptions.KnownNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
 
+// Audit log ən kənarda dayanır ki, ExceptionHandlingMiddleware xətanı 401/404/409-a
+// çevirdikdən SONRA yekun status kodunu və cavab gövdəsini görsün.
+// İstifadəçi claim-ləri sorğu geri qayıdarkən HttpContext-də artıq mövcud olur.
+app.UseRequestLogging();
+
 app.UseExceptionHandling();
 app.UseSerilogRequestLogging();
 

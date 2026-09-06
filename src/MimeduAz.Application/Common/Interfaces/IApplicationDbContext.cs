@@ -29,6 +29,7 @@ public interface IApplicationDbContext
     DbSet<QuizAttempt> QuizAttempts { get; }
     DbSet<Certificate> Certificates { get; }
     DbSet<BlogPost> BlogPosts { get; }
+    DbSet<RequestLog> RequestLogs { get; }
 
     DatabaseFacade Database { get; }
 
