@@ -109,11 +109,18 @@ const string CorsPolicy = "MimeduFrontend";
 //   Cors__AllowedOrigins=https://a.az,https://b.az   (vergüllə - hostinq panellərində daha rahat)
 var corsSection = builder.Configuration.GetSection("Cors:AllowedOrigins");
 
-var allowedOrigins = (corsSection.Value is { Length: > 0 } commaSeparated
-        ? commaSeparated.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        : corsSection.Get<string[]>() ?? Array.Empty<string>())
-    // Sondakı "/" ən çox rast gəlinən səhvdir - origin müqayisəsi hərfi aparılır.
-    .Select(origin => origin.Trim().TrimEnd('/'))
+var rawOrigins = corsSection.Value is { Length: > 0 } inlineValue
+    ? new[] { inlineValue }
+    : corsSection.Get<string[]>() ?? Array.Empty<string>();
+
+// Konfiqurasiya panellərində dəyər çox vaxt səhv formatda yapışdırılır: dırnaq içində,
+// nöqtəli vergüllə, sonunda "/" və ya artıq boşluqla. CORS müqayisəsi hərfi olduğu üçün
+// belə dəyər səssizcə heç nəyə uyğun gəlmir və brauzerdə ümumi "CORS xətası" görünür.
+// Ona görə bütün ayrıcıları qəbul edib dəyərləri normallaşdırırıq.
+var allowedOrigins = rawOrigins
+    .SelectMany(value => value.Split(
+        new[] { ',', ';', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+    .Select(origin => origin.Trim().Trim('"', '\'').Trim().TrimEnd('/'))
     .Where(origin => !string.IsNullOrWhiteSpace(origin))
     .Distinct(StringComparer.OrdinalIgnoreCase)
     .ToArray();
@@ -122,6 +129,12 @@ if (allowedOrigins.Length == 0)
 {
     allowedOrigins = new[] { "http://localhost:5173" };
 }
+
+// Formatı düzgün olmayan dəyər sükutla yox sayılmasın - loga düşsün.
+var invalidOrigins = allowedOrigins
+    .Where(origin => !Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+                     || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+    .ToArray();
 
 builder.Services.AddCors(options =>
     options.AddPolicy(CorsPolicy, policy => policy
@@ -148,7 +161,16 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 // Qalxarkən icazə verilən origin-ləri loglayırıq - CORS problemini diaqnoz etmək üçün
 // ilk baxılacaq yer məhz budur (Render/hostinq loglarında dərhal görünür).
 app.Logger.LogInformation(
-    "CORS icazə verilən origin-lər: {Origins}", string.Join(", ", allowedOrigins));
+    "CORS icazə verilən origin-lər ({Count}): {Origins}",
+    allowedOrigins.Length, string.Join(" | ", allowedOrigins));
+
+if (invalidOrigins.Length > 0)
+{
+    app.Logger.LogWarning(
+        "CORS: bu dəyərlər düzgün origin deyil və heç bir sorğuya uyğun gəlməyəcək: {Invalid}. "
+        + "Origin yalnız sxem+host(+port) olmalıdır, məs. https://mimedu.az (yol və sondakı \"/\" olmadan).",
+        string.Join(" | ", invalidOrigins));
+}
 
 // İcazəsiz origin-dən gələn sorğunu xəbərdarlıq kimi loglayırıq. Brauzer belə halda
 // yalnız ümumi "CORS xətası" göstərir - səbəbi yalnız server tərəfdə görünür.
