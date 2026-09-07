@@ -31,9 +31,18 @@ endpoint-lər, request/response formatları, auth axını və xəta idarəetməs
 ### `POST /auth/register`
 Qeydiyyat. `admin@mimedu.az` ilə qeydiyyatdan keçən avtomatik Admin rolu alır (seed davranışı).
 
+**Hesab növü:** `accountType` göndərilməsə **`Student`** yaradılır — yəni default istifadəçi
+təlim alan/keçən şagirddir. Material satmaq istəyən üçün `"Teacher"` göndərilir.
+
 ```ts
 // Request
-{ fullName: string, email: string, password: string, subject?: string }
+{
+  fullName: string,
+  email: string,
+  password: string,
+  subject?: string,
+  accountType?: "Student" | "Teacher"   // default: "Student"
+}
 
 // 200 OK
 {
@@ -43,12 +52,27 @@ Qeydiyyat. `admin@mimedu.az` ilə qeydiyyatdan keçən avtomatik Admin rolu alı
   user: {
     id: string, fullName: string, email: string,
     subject: string | null,
-    roles: string[],       // ["Teacher"] və ya ["Admin"]
+    roles: string[],              // ["Student"] | ["Teacher"] | ["Admin"]
+    canPublishResources: boolean, // Resurs yükləyə bilirmi (Teacher/Admin)
     createdAt: string
   }
 }
 ```
+
 Xətalar: `400` (zəif şifrə/format — `errors` obyektində sahə üzrə mesajlar), `409` (e-poçt artıq var).
+
+### `POST /auth/become-author` 🔒
+Şagird hesabını müəllif hesabına yüksəldir — bundan sonra Resurs Bankına material yükləyə bilər.
+Artıq müəllifdirsə heç nə dəyişmir (idempotent).
+
+```ts
+// Request
+{ subject?: string }   // müəllimin əsas fənni
+
+// 200 OK — UserDto (roles: ["Student","Teacher"], canPublishResources: true)
+```
+⚠️ Yeni rol **mövcud access token-də əks olunmur** — çağırışdan sonra `POST /auth/refresh`
+edin, əks halda `POST /resources` hələ də 403 verəcək.
 
 ### `POST /auth/login`
 ```ts
@@ -76,7 +100,7 @@ Xəta: `401` (token etibarsız/bitib/artıq istifadə olunub).
 Cari istifadəçinin profili. `Authorization` header tələb olunur.
 ```ts
 // 200 OK
-{ id, fullName, email, subject, roles: string[], createdAt }
+{ id, fullName, email, subject, roles: string[], canPublishResources: boolean, createdAt }
 ```
 
 ---
@@ -132,8 +156,12 @@ Publik (amma Pending/Rejected resurs yalnız müəllifi/admin görür — başqa
 }
 ```
 
-### `POST /resources` 🔒
+### `POST /resources` 🔒 (yalnız Teacher / Admin)
 Yeni resurs yükləmə. **`multipart/form-data`** — JSON deyil!
+
+⚠️ Şagird (`Student`) hesabı bu endpoint-ə **403** alır. Frontend "Material yüklə"
+düyməsini `user.canPublishResources` sahəsinə görə göstərməlidir; şagirdə isə
+`POST /auth/become-author` təklif olunmalıdır.
 
 ```
 FormData:
@@ -227,12 +255,15 @@ Publik. Bütün təlimlər.
   seatLimit: number | null,   // yalnız Live-da rəqəm, digərlərində null (limitsiz)
   seatsTaken: number,
   seatsLeft: number | null,   // seatLimit null-dursa bu da null
+  lessonCount: number,        // təlimdə neçə dərs var
   createdAt
 }]
 ```
 
 ### `GET /trainings/{id}`
-Publik. `TrainingDetailDto` — yuxarıdakı + `syllabus: [{ id, orderIndex, text }]`.
+Publik. `TrainingDetailDto` — yuxarıdakı + `syllabus: [{ id, orderIndex, text }]`,
+`lessonCount: number` və `isEnrolled: boolean` (token göndərilibsə — "Dərslərə keç"
+düyməsini göstərmək üçün).
 
 ### `POST /trainings` 🔒 (yalnız Admin)
 ```ts
@@ -252,11 +283,89 @@ Cari istifadəçinin yazıldığı təlimlər (enrollment məlumatı ilə).
 [{
   enrollmentId, trainingId, name, format, metaLabel, durationHours,
   progressPercent: number,
+  completedLessonCount: number,
+  totalLessonCount: number,
   status: "InProgress" | "Completed",
   enrolledAt,
+  completedAt: string | null,
   certificateCode: string | null   // Completed olub sertifikat verilibsə dolu
 }]
 ```
+
+---
+
+## 3a. Dərslər — istifadəçinin təlim keçmə axını 🔒
+
+Bu, "istifadəçi girib təlimə baxır" hissəsidir. Ardıcıllıq:
+
+```
+GET  /trainings/{id}                          → isEnrolled: false, lessonCount: 4
+POST /cart/items  { Training, id }            → səbətə at
+POST /orders/checkout                         → enrollment yaranır
+GET  /trainings/{id}/lessons                  → videolar açılır
+POST /trainings/{id}/lessons/{lessonId}/complete   → hər dərsdən sonra
+     ... sonuncu dərsdə → certificateCode qayıdır
+```
+
+### `GET /trainings/{trainingId}/lessons` 🔒
+Təlimin dərsləri və irəliləyiş. **Yalnız bu təlimə yazılmış istifadəçi (və admin)** —
+əks halda `403`. Token yoxdursa `401`.
+
+```ts
+// TrainingLessonsDto
+{
+  trainingId: string,
+  trainingName: string,
+  lessons: [{
+    id: string,
+    orderIndex: number,          // 0-dan başlayır, sıralı gəlir
+    title: string,
+    description: string,
+    videoUrl: string | null,     // YouTube/Vimeo linki
+    durationMinutes: number | null,
+    isCompleted: boolean,
+    completedAt: string | null
+  }],
+  completedLessonCount: number,
+  totalLessonCount: number,
+  progressPercent: number,
+  status: "InProgress" | "Completed",
+  certificateCode: string | null
+}
+```
+
+### `POST /trainings/{trainingId}/lessons/{lessonId}/complete` 🔒
+Dərsi tamamlanmış işarələyir. **Bütün dərslər bitəndə təlim avtomatik tamamlanır və
+sertifikat verilir** — kodu cavabdakı `certificateCode`-da gəlir.
+
+```ts
+// LessonProgressDto
+{
+  trainingId: string,
+  lessonId: string,
+  isCompleted: boolean,
+  completedLessonCount: number,
+  totalLessonCount: number,
+  progressPercent: number,        // avtomatik hesablanır
+  status: "InProgress" | "Completed",
+  certificateCode: string | null  // yalnız 100%-də dolu
+}
+```
+Eyni dərsi təkrar göndərmək faizi artırmır (idempotent).
+
+### `DELETE /trainings/{trainingId}/lessons/{lessonId}/complete` 🔒
+"Tamamlandı" işarəsini geri götürür. Eyni `LessonProgressDto` qayıdır.
+
+### `POST /trainings/{trainingId}/lessons` 🔒 (yalnız Admin)
+Mövcud təlimə dərs əlavə edir və ya hamısını əvəz edir.
+```ts
+{
+  mode: "append" | "replace",
+  lessons: [{ title, description, videoUrl?, durationMinutes? }]
+}
+// 200 OK — TrainingLessonsDto
+```
+Dərs sayı dəyişəndə bütün yazılmış istifadəçilərin faizi avtomatik yenidən hesablanır.
 
 ---
 
@@ -523,5 +632,7 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 | `admin@mimedu.az` | `Admin123!` | Admin |
 | `nigar@mimedu.az` | `Teacher123!` | Teacher |
 | `elvin@mimedu.az` | `Teacher123!` | Teacher |
+| `sevinc@mimedu.az` | `Student123!` | Student |
+| `tural@mimedu.az` | `Student123!` | Student |
 
 Test sertifikat kodu: **`MIM-2026-4417`** (`/certificates/verify/MIM-2026-4417` ilə sınayın).

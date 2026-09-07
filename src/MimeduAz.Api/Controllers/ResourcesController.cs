@@ -4,6 +4,7 @@ using MimeduAz.Application.Services;
 using MimeduAz.Contracts.Common;
 using MimeduAz.Contracts.Quizzes;
 using MimeduAz.Contracts.Resources;
+using MimeduAz.Domain.Constants;
 using MimeduAz.Domain.Enums;
 
 namespace MimeduAz.Api.Controllers;
@@ -66,7 +67,7 @@ public sealed class ResourcesController : ControllerBase
     /// İcazə verilən formatlar: PDF, DOCX, PPTX; maksimum 25 MB.
     /// </summary>
     [HttpPost]
-    [Authorize]
+    [Authorize(Roles = AppRoles.AuthorRoles)]
     [RequestSizeLimit(26_214_400)]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ResourceDetailDto), StatusCodes.Status201Created)]

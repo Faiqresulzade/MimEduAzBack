@@ -8,6 +8,7 @@ using MimeduAz.Application.Common.Options;
 using MimeduAz.Contracts.Auth;
 using MimeduAz.Domain.Constants;
 using MimeduAz.Domain.Entities;
+using MimeduAz.Domain.Enums;
 
 namespace MimeduAz.Application.Services;
 
@@ -62,7 +63,13 @@ public sealed class AuthService : IAuthService
         }
 
         // admin@mimedu.az avtomatik Admin rolu alır (prototipdəki davranış).
-        var role = IsAdminEmail(email) ? AppRoles.Admin : AppRoles.Teacher;
+        // Qalan hallarda hesab növü seçilir; göndərilməsə şagird sayılır -
+        // yəni default istifadəçi təlim alan, material satmayan hesabdır.
+        var role = IsAdminEmail(email)
+            ? AppRoles.Admin
+            : request.AccountType == AccountType.Teacher
+                ? AppRoles.Teacher
+                : AppRoles.Student;
         await _userManager.AddToRoleAsync(user, role);
 
         _logger.LogInformation("Yeni istifadəçi qeydiyyatdan keçdi. UserId: {UserId}, Rol: {Role}", user.Id, role);
@@ -146,6 +153,33 @@ public sealed class AuthService : IAuthService
         return ToDto(user, roles);
     }
 
+    public async Task<UserDto> BecomeAuthorAsync(BecomeAuthorRequest request, CancellationToken ct)
+    {
+        var userId = _currentUser.RequireUserId();
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct)
+                   ?? throw new NotFoundException("İstifadəçi tapılmadı.");
+
+        if (!string.IsNullOrWhiteSpace(request.Subject))
+        {
+            user.Subject = request.Subject.Trim();
+            await _db.SaveChangesAsync(ct);
+        }
+
+        if (!await _userManager.IsInRoleAsync(user, AppRoles.Teacher))
+        {
+            var added = await _userManager.AddToRoleAsync(user, AppRoles.Teacher);
+            if (!added.Succeeded)
+            {
+                throw new BadRequestException("Müəllif rolu təyin edilə bilmədi.");
+            }
+
+            _logger.LogInformation("İstifadəçi müəllif oldu. UserId: {UserId}", user.Id);
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        return ToDto(user, roles);
+    }
+
     private async Task<AuthResponse> BuildAuthResponseAsync(ApplicationUser user, CancellationToken ct)
     {
         var roles = await _userManager.GetRolesAsync(user);
@@ -173,6 +207,7 @@ public sealed class AuthService : IAuthService
         user.Email ?? string.Empty,
         user.Subject,
         roles.ToList(),
+        roles.Any(r => r is AppRoles.Teacher or AppRoles.Admin),
         user.CreatedAt);
 
     private static Dictionary<string, string[]> ToErrorDictionary(IdentityResult result) =>

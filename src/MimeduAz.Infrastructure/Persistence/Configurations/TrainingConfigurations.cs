@@ -21,6 +21,48 @@ public sealed class TrainingConfiguration : IEntityTypeConfiguration<Training>
             .WithOne(s => s.Training)
             .HasForeignKey(s => s.TrainingId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(t => t.Lessons)
+            .WithOne(l => l.Training)
+            .HasForeignKey(l => l.TrainingId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class TrainingLessonConfiguration : IEntityTypeConfiguration<TrainingLesson>
+{
+    public void Configure(EntityTypeBuilder<TrainingLesson> builder)
+    {
+        builder.ToTable("training_lessons");
+        builder.HasKey(l => l.Id);
+
+        builder.Property(l => l.Title).IsRequired().HasMaxLength(200);
+        builder.Property(l => l.Description).IsRequired().HasMaxLength(2000);
+        builder.Property(l => l.VideoUrl).HasMaxLength(1000);
+
+        builder.HasIndex(l => new { l.TrainingId, l.OrderIndex });
+    }
+}
+
+public sealed class LessonCompletionConfiguration : IEntityTypeConfiguration<LessonCompletion>
+{
+    public void Configure(EntityTypeBuilder<LessonCompletion> builder)
+    {
+        builder.ToTable("lesson_completions");
+        builder.HasKey(c => c.Id);
+
+        builder.HasOne(c => c.Enrollment)
+            .WithMany(e => e.CompletedLessons)
+            .HasForeignKey(c => c.EnrollmentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(c => c.Lesson)
+            .WithMany(l => l.Completions)
+            .HasForeignKey(c => c.LessonId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Eyni dərs bir enrollment üçün yalnız bir dəfə tamamlana bilər.
+        builder.HasIndex(c => new { c.EnrollmentId, c.LessonId }).IsUnique();
     }
 }
 

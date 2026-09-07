@@ -170,6 +170,59 @@ public sealed class CertificateService : ICertificateService
         return certificate.ToDto();
     }
 
+    public async Task<CertificateDto> IssueForTrainingCompletionAsync(Guid enrollmentId, CancellationToken ct)
+    {
+        var enrollment = await _db.Enrollments
+            .Include(e => e.User)
+            .Include(e => e.Training)
+            .FirstOrDefaultAsync(e => e.Id == enrollmentId, ct)
+            ?? throw NotFoundException.For("Təlim qeydiyyatı", enrollmentId);
+
+        if (enrollment.Status != EnrollmentStatus.Completed)
+        {
+            throw new BadRequestException("Sertifikat yalnız tamamlanmış təlim üçün verilir.");
+        }
+
+        // Eyni istifadəçi+təlim üçün ikinci sertifikat yaradılmır.
+        var existing = await _db.Certificates
+            .Include(c => c.User)
+            .Include(c => c.Training)
+            .FirstOrDefaultAsync(
+                c => c.UserId == enrollment.UserId && c.TrainingId == enrollment.TrainingId, ct);
+
+        if (existing is not null)
+        {
+            return existing.ToDto();
+        }
+
+        var issuedAt = DateTime.UtcNow;
+        var training = enrollment.Training;
+
+        var certificate = new Certificate
+        {
+            Code = await GenerateCertificateCodeAsync(issuedAt, ct),
+            UserId = enrollment.UserId,
+            TrainingId = enrollment.TrainingId,
+            Description = BuildTrainingDescription(
+                enrollment.User?.FullName ?? string.Empty,
+                training?.Name ?? "Təlim",
+                training?.DurationHours ?? 0,
+                issuedAt),
+            IssuedAt = issuedAt
+        };
+
+        _db.Certificates.Add(certificate);
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Təlim sertifikatı avtomatik verildi. CertificateId: {CertificateId}, EnrollmentId: {EnrollmentId}",
+            certificate.Id, enrollmentId);
+
+        certificate.User = enrollment.User;
+        certificate.Training = training;
+        return certificate.ToDto();
+    }
+
     private static string BuildTrainingDescription(string fullName, string trainingName, int hours, DateTime issuedAt) =>
         $"{fullName} · «{trainingName}» · {hours} saat · {issuedAt.ToString("dd.MM.yyyy", AzCulture)}";
 

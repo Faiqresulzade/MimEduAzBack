@@ -22,5 +22,6 @@ public class Training
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<TrainingSyllabusItem> SyllabusItems { get; set; } = new List<TrainingSyllabusItem>();
+    public ICollection<TrainingLesson> Lessons { get; set; } = new List<TrainingLesson>();
     public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
 }

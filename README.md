@@ -78,6 +78,8 @@ dotnet test
 | E-poçt | Şifrə | Rol |
 |---|---|---|
 | `admin@mimedu.az` | `Admin123!` | Admin |
+| `sevinc@mimedu.az` | `Student123!` | **Student** (yalnız təlim alır) |
+| `tural@mimedu.az` | `Student123!` | **Student** |
 | `nigar@mimedu.az` | `Teacher123!` | Teacher (2 resurs müəllifi) |
 | `elvin@mimedu.az` | `Teacher123!` | Teacher |
 | `aysel@mimedu.az` | `Teacher123!` | Teacher |
@@ -103,8 +105,10 @@ MimeduAz.sln
 │   ├── MimeduAz.Infrastructure/  # EF Core DbContext, konfiqurasiyalar, migrations, JWT, fayl saxlama
 │   └── MimeduAz.Api/             # Controller-lər, middleware, Swagger, Program.cs
 ├── tests/
-│   └── MimeduAz.Tests/           # Biznes məntiq üzrə unit testlər (38 test)
-├── scripts/smoke-test.mjs        # Real API üzərində uçdan-uca yoxlama (100 assertion)
+│   └── MimeduAz.Tests/           # Biznes məntiq üzrə unit testlər (52 test)
+├── scripts/
+│   ├── smoke-test.mjs            # Ümumi uçdan-uca yoxlama (100 assertion)
+│   └── student-flow-test.mjs     # Şagird axını: təlim al → bax → tamamla (41 assertion)
 ├── docker-compose.yml            # Local PostgreSQL
 └── requests.http                 # Manual API testləri
 ```
@@ -284,6 +288,51 @@ Filtrlər: `method`, `path`, `statusCode`, `userId`, `onlyErrors`, `from`, `to`,
 
 ---
 
+## Rollar və istifadəçi axını
+
+### Üç rol
+
+| Rol | Nə edə bilir |
+|---|---|
+| **Student** | Təlim alır, dərslərə baxır, imtahan verir, sertifikat alır, resurs endirir. **Material yükləyə bilmir.** |
+| **Teacher** | Şagirdin hər şeyi **+** Resurs Bankına material yükləyib satmaq (80% pay). |
+| **Admin** | Hər şey + moderasiya, təlim/dərs idarəetməsi, statistika, audit log. |
+
+Qeydiyyatda `accountType` göndərilməsə **`Student`** yaradılır — default istifadəçi
+təlim alan şagirddir. Şagird sonradan `POST /auth/become-author` ilə müəllif ola bilər
+(mövcud `Student` rolu itmir, üstünə `Teacher` əlavə olunur).
+
+> ⚠️ `become-author`-dan sonra yeni rol **mövcud access token-də olmur** — istifadəçi
+> `POST /auth/refresh` etməlidir, əks halda `POST /resources` hələ də 403 verər.
+
+### Təlim keçmə axını
+
+```
+GET  /trainings/{id}                    → isEnrolled: false, lessonCount: 4
+POST /cart/items { Training, id }       → səbətə
+POST /orders/checkout                   → Enrollment yaranır
+GET  /trainings/{id}/lessons            → videolar açılır (yazılmayana 403)
+POST /trainings/{id}/lessons/{lid}/complete   → hər dərsdən sonra
+        └─ sonuncu dərsdə → sertifikat avtomatik verilir
+```
+
+- **Dərs məzmunu qorunur:** `videoUrl` yalnız təlimə yazılmış istifadəçiyə (və adminə)
+  qaytarılır; başqasına `403`.
+- **İrəliləyiş avtomatikdir:** `progressPercent` = tamamlanmış dərs / ümumi dərs.
+  Eyni dərsi təkrar tamamlamaq faizi artırmır; işarəni geri götürmək olar.
+- **Sertifikat 100%-də özü yaranır** (eyni təlim üçün idempotent) və `Enrollment`
+  `Completed` statusuna keçir.
+- Admin sonradan dərs əlavə edərsə (`POST /trainings/{id}/lessons`), bütün yazılmış
+  istifadəçilərin faizi **yenidən hesablanır** — köhnə 100% səhv qalmır.
+
+Bu axın `scripts/student-flow-test.mjs` ilə uçdan-uca yoxlanılır (41 assertion):
+
+```bash
+node scripts/student-flow-test.mjs
+```
+
+---
+
 ## Autentifikasiya
 
 - ASP.NET Core Identity (`IdentityDbContext<ApplicationUser, ApplicationRole, Guid>`).
@@ -307,13 +356,14 @@ Bütün endpoint-lər `/api/v1/` prefiksi ilə.
 | POST | `/auth/refresh` | Publik |
 | POST | `/auth/logout` | Publik |
 | GET | `/auth/me` | Authorize |
+| POST | `/auth/become-author` | Authorize |
 
 ### Resurslar
 | Metod | Yol | İcazə |
 |---|---|---|
 | GET | `/resources` | Publik (filtr: `subject`, `grade`, `type`, `isPaid`, `search`, `page`, `pageSize`) |
 | GET | `/resources/{id}` | Publik |
-| POST | `/resources` | Authorize (multipart/form-data) |
+| POST | `/resources` | **Teacher / Admin** (multipart/form-data) |
 | POST | `/resources/{id}/download` | Publik (ödənişli üçün satın alma tələb olunur) |
 | GET | `/resources/mine` | Authorize |
 | GET | `/resources/author/{userId}` | Publik |
@@ -327,6 +377,10 @@ Bütün endpoint-lər `/api/v1/` prefiksi ilə.
 | GET | `/trainings/{id}` | Publik |
 | POST | `/trainings` | Admin |
 | GET | `/trainings/mine` | Authorize |
+| GET | `/trainings/{id}/lessons` | Authorize (**yalnız yazılanlar**) |
+| POST | `/trainings/{id}/lessons/{lessonId}/complete` | Authorize |
+| DELETE | `/trainings/{id}/lessons/{lessonId}/complete` | Authorize |
+| POST | `/trainings/{id}/lessons` | Admin |
 
 ### Səbət və sifariş
 | Metod | Yol | İcazə |

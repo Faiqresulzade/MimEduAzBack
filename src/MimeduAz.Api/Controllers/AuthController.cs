@@ -58,4 +58,16 @@ public sealed class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<UserDto>> Me(CancellationToken ct) =>
         Ok(await _auth.GetCurrentUserAsync(ct));
+
+    /// <summary>
+    /// Şagird hesabını müəllif hesabına yüksəldir — bundan sonra Resurs Bankına
+    /// material yükləyib sata bilər. Artıq müəllifdirsə heç nə dəyişmir.
+    /// Yeni rol növbəti token-də əks olunur, ona görə sonra /auth/refresh çağırılmalıdır.
+    /// </summary>
+    [HttpPost("become-author")]
+    [Authorize]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<UserDto>> BecomeAuthor(BecomeAuthorRequest? request, CancellationToken ct) =>
+        Ok(await _auth.BecomeAuthorAsync(request ?? new BecomeAuthorRequest(null), ct));
 }

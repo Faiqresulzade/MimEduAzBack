@@ -10,6 +10,7 @@
 #   admin@mimedu.az  / Admin123!    (Admin)
 #   nigar@mimedu.az  / Teacher123!  (Teacher, 2 resurs müəllifi)
 #   elvin@mimedu.az  / Teacher123!  (Teacher)
+#   sevinc@mimedu.az / Student123!  (Student - yalniz telim alir)
 #
 # QEYD: Checkout demo rejimdədir — heç bir kart məlumatı göndərilmir və qəbul edilmir.
 ###############################################################################
@@ -515,3 +516,147 @@ Authorization: Bearer {{adminToken}}
 ### 9.7 Müəllim audit log-a baxmağa çalışır — 403 gözlənilir
 GET {{baseUrl}}/api/v1/admin/logs
 Authorization: Bearer {{teacherToken}}
+
+
+###############################################################################
+# 10. ŞAGİRD AXINI — təlim al, dərslərə bax, tamamla
+###############################################################################
+
+### 10.1 Şagird qeydiyyatı (accountType göndərilməsə default Student)
+# @name studentRegister
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: {{contentType}}
+
+{
+  "fullName": "Şagird Test",
+  "email": "sagird.test@mimedu.az",
+  "password": "Test12345"
+}
+
+### 10.2 Müəllif kimi qeydiyyat (material satmaq üçün)
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: {{contentType}}
+
+{
+  "fullName": "Müəllif Test",
+  "email": "muellif.test@mimedu.az",
+  "password": "Test12345",
+  "subject": "Fizika",
+  "accountType": "Teacher"
+}
+
+### 10.3 Seed şagirdi ilə giriş
+# @name studentLogin
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "sevinc@mimedu.az",
+  "password": "Student123!"
+}
+
+@studentToken = {{studentLogin.response.body.accessToken}}
+
+### 10.4 Şagird material yükləməyə çalışır — 403 gözlənilir
+POST {{baseUrl}}/api/v1/resources
+Authorization: Bearer {{studentToken}}
+Content-Type: multipart/form-data; boundary=MimeduBoundary
+
+--MimeduBoundary
+Content-Disposition: form-data; name="Name"
+
+İcazəsiz yükləmə
+--MimeduBoundary
+Content-Disposition: form-data; name="Subject"
+
+Kimya
+--MimeduBoundary
+Content-Disposition: form-data; name="Grade"
+
+9
+--MimeduBoundary
+Content-Disposition: form-data; name="Type"
+
+WorkSheet
+--MimeduBoundary
+Content-Disposition: form-data; name="IsPaid"
+
+false
+--MimeduBoundary
+Content-Disposition: form-data; name="Price"
+
+0
+--MimeduBoundary
+Content-Disposition: form-data; name="file"; filename="numune.pdf"
+Content-Type: application/pdf
+
+< ./samples/numune.pdf
+--MimeduBoundary--
+
+### 10.5 Yazılmadan dərslərə baxmaq — 403 gözlənilir
+GET {{baseUrl}}/api/v1/trainings/{{trainVideo}}/lessons
+Authorization: Bearer {{studentToken}}
+
+### 10.6 Təlimi səbətə at
+POST {{baseUrl}}/api/v1/cart/items
+Authorization: Bearer {{studentToken}}
+Content-Type: {{contentType}}
+
+{
+  "itemType": "Training",
+  "itemId": "{{trainVideo}}"
+}
+
+### 10.7 Checkout — enrollment yaranır
+POST {{baseUrl}}/api/v1/orders/checkout
+Authorization: Bearer {{studentToken}}
+Content-Type: {{contentType}}
+
+{}
+
+### 10.8 İndi dərslər açılır (videoUrl dolu gəlir)
+# @name lessons
+GET {{baseUrl}}/api/v1/trainings/{{trainVideo}}/lessons
+Authorization: Bearer {{studentToken}}
+
+### 10.9 Birinci dərsi tamamla (faiz avtomatik hesablanır)
+POST {{baseUrl}}/api/v1/trainings/{{trainVideo}}/lessons/{{lessons.response.body.lessons[0].id}}/complete
+Authorization: Bearer {{studentToken}}
+
+### 10.10 İşarəni geri götür
+DELETE {{baseUrl}}/api/v1/trainings/{{trainVideo}}/lessons/{{lessons.response.body.lessons[0].id}}/complete
+Authorization: Bearer {{studentToken}}
+
+### 10.11 Sonuncu dərs → sertifikat avtomatik verilir (certificateCode dolur)
+POST {{baseUrl}}/api/v1/trainings/{{trainVideo}}/lessons/{{lessons.response.body.lessons[3].id}}/complete
+Authorization: Bearer {{studentToken}}
+
+### 10.12 Mənim təlimlərim (irəliləyiş + dərs sayğacı)
+GET {{baseUrl}}/api/v1/trainings/mine
+Authorization: Bearer {{studentToken}}
+
+### 10.13 Şagird müəllif olur
+POST {{baseUrl}}/api/v1/auth/become-author
+Authorization: Bearer {{studentToken}}
+Content-Type: {{contentType}}
+
+{
+  "subject": "Kimya"
+}
+
+### 10.14 Admin mövcud təlimə dərs əlavə edir
+POST {{baseUrl}}/api/v1/trainings/{{trainAi}}/lessons
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "mode": "append",
+  "lessons": [
+    {
+      "title": "Bonus: AI ilə valideyn rəyi hazırlamaq",
+      "description": "Şagirdin irəliləyişini əks etdirən qısa valideyn rəyi mətnini AI ilə hazırlamaq.",
+      "videoUrl": "https://www.youtube.com/watch?v=example-bonus",
+      "durationMinutes": 20
+    }
+  ]
+}

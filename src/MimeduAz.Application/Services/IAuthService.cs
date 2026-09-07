@@ -9,4 +9,10 @@ public interface IAuthService
     Task<AuthResponse> RefreshAsync(RefreshTokenRequest request, CancellationToken ct);
     Task LogoutAsync(LogoutRequest request, CancellationToken ct);
     Task<UserDto> GetCurrentUserAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Şagird hesabını müəllif (Teacher) hesabına yüksəldir ki, Resurs Bankına
+    /// material yükləyə bilsin. Artıq müəllifdirsə heç nə dəyişmir (idempotent).
+    /// </summary>
+    Task<UserDto> BecomeAuthorAsync(BecomeAuthorRequest request, CancellationToken ct);
 }

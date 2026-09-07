@@ -19,6 +19,8 @@ public interface IApplicationDbContext
     DbSet<Resource> Resources { get; }
     DbSet<Training> Trainings { get; }
     DbSet<TrainingSyllabusItem> TrainingSyllabusItems { get; }
+    DbSet<TrainingLesson> TrainingLessons { get; }
+    DbSet<LessonCompletion> LessonCompletions { get; }
     DbSet<Enrollment> Enrollments { get; }
     DbSet<Cart> Carts { get; }
     DbSet<CartItem> CartItems { get; }

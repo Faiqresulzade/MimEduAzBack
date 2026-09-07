@@ -16,4 +16,9 @@ public class Enrollment
     public int ProgressPercent { get; set; }
     public EnrollmentStatus Status { get; set; } = EnrollmentStatus.InProgress;
     public DateTime EnrolledAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Təlim 100% tamamlandığı an.</summary>
+    public DateTime? CompletedAt { get; set; }
+
+    public ICollection<LessonCompletion> CompletedLessons { get; set; } = new List<LessonCompletion>();
 }

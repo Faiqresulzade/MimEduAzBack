@@ -17,4 +17,10 @@ public interface ICertificateService
     /// mövcud sertifikatı qaytarır (idempotent).
     /// </summary>
     Task<CertificateDto> IssueForQuizAttemptAsync(Guid attemptId, CancellationToken ct);
+
+    /// <summary>
+    /// Təlimin bütün dərsləri tamamlananda sertifikat verir. Eyni istifadəçi+təlim
+    /// üçün təkrar çağırılarsa mövcud sertifikatı qaytarır (idempotent).
+    /// </summary>
+    Task<CertificateDto> IssueForTrainingCompletionAsync(Guid enrollmentId, CancellationToken ct);
 }

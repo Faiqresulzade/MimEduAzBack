@@ -16,6 +16,8 @@ public sealed class ApplicationDbContext
     public DbSet<Resource> Resources => Set<Resource>();
     public DbSet<Training> Trainings => Set<Training>();
     public DbSet<TrainingSyllabusItem> TrainingSyllabusItems => Set<TrainingSyllabusItem>();
+    public DbSet<TrainingLesson> TrainingLessons => Set<TrainingLesson>();
+    public DbSet<LessonCompletion> LessonCompletions => Set<LessonCompletion>();
     public DbSet<Enrollment> Enrollments => Set<Enrollment>();
     public DbSet<Cart> Carts => Set<Cart>();
     public DbSet<CartItem> CartItems => Set<CartItem>();

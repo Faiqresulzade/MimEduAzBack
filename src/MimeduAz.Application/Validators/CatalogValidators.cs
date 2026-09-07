@@ -54,6 +54,8 @@ public sealed class CreateTrainingRequestValidator : AbstractValidator<CreateTra
         RuleFor(x => x.SeatLimit)
             .NotNull().When(x => x.Format == TrainingFormat.Live)
             .WithMessage("Canlı təlim üçün yer limiti göstərilməlidir.");
+
+        RuleForEach(x => x.Lessons).SetValidator(new CreateTrainingLessonRequestValidator());
     }
 }
 
@@ -138,5 +140,37 @@ public sealed class SaveBlogPostRequestValidator : AbstractValidator<SaveBlogPos
         RuleFor(x => x.Body)
             .Must(b => b.Any(p => !string.IsNullOrWhiteSpace(p)))
             .WithMessage("Ən azı bir paraqraf olmalıdır.");
+    }
+}
+
+public sealed class CreateTrainingLessonRequestValidator : AbstractValidator<CreateTrainingLessonRequest>
+{
+    public CreateTrainingLessonRequestValidator()
+    {
+        RuleFor(x => x.Title).NotEmpty().WithMessage("Dərsin başlığı boş ola bilməz.").MaximumLength(200);
+        RuleFor(x => x.Description).NotEmpty().WithMessage("Dərsin təsviri boş ola bilməz.").MaximumLength(2000);
+
+        RuleFor(x => x.VideoUrl)
+            .Must(url => Uri.TryCreate(url, UriKind.Absolute, out var uri)
+                         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            .When(x => !string.IsNullOrWhiteSpace(x.VideoUrl))
+            .WithMessage("Video linki tam URL olmalıdır (http:// və ya https:// ilə).");
+
+        RuleFor(x => x.DurationMinutes)
+            .InclusiveBetween(1, 600).When(x => x.DurationMinutes.HasValue)
+            .WithMessage("Dərsin müddəti 1 ilə 600 dəqiqə arasında olmalıdır.");
+    }
+}
+
+public sealed class SaveTrainingLessonsRequestValidator : AbstractValidator<SaveTrainingLessonsRequest>
+{
+    public SaveTrainingLessonsRequestValidator()
+    {
+        RuleFor(x => x.Mode)
+            .Must(m => m is "append" or "replace")
+            .WithMessage("Mode yalnız \"append\" və ya \"replace\" ola bilər.");
+
+        RuleFor(x => x.Lessons).NotEmpty().WithMessage("Ən azı bir dərs göndərilməlidir.");
+        RuleForEach(x => x.Lessons).SetValidator(new CreateTrainingLessonRequestValidator());
     }
 }
