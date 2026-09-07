@@ -103,8 +103,25 @@ builder.Services
 builder.Services.AddAuthorization();
 
 const string CorsPolicy = "MimeduFrontend";
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:5173" };
+
+// Origin-lər iki formatda verilə bilər:
+//   Cors__AllowedOrigins__0=https://mimedu.az        (indeksli massiv)
+//   Cors__AllowedOrigins=https://a.az,https://b.az   (vergüllə - hostinq panellərində daha rahat)
+var corsSection = builder.Configuration.GetSection("Cors:AllowedOrigins");
+
+var allowedOrigins = (corsSection.Value is { Length: > 0 } commaSeparated
+        ? commaSeparated.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        : corsSection.Get<string[]>() ?? Array.Empty<string>())
+    // Sondakı "/" ən çox rast gəlinən səhvdir - origin müqayisəsi hərfi aparılır.
+    .Select(origin => origin.Trim().TrimEnd('/'))
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
+if (allowedOrigins.Length == 0)
+{
+    allowedOrigins = new[] { "http://localhost:5173" };
+}
 
 builder.Services.AddCors(options =>
     options.AddPolicy(CorsPolicy, policy => policy
@@ -128,6 +145,28 @@ forwardedHeadersOptions.KnownNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
 
+// Qalxarkən icazə verilən origin-ləri loglayırıq - CORS problemini diaqnoz etmək üçün
+// ilk baxılacaq yer məhz budur (Render/hostinq loglarında dərhal görünür).
+app.Logger.LogInformation(
+    "CORS icazə verilən origin-lər: {Origins}", string.Join(", ", allowedOrigins));
+
+// İcazəsiz origin-dən gələn sorğunu xəbərdarlıq kimi loglayırıq. Brauzer belə halda
+// yalnız ümumi "CORS xətası" göstərir - səbəbi yalnız server tərəfdə görünür.
+app.Use(async (context, next) =>
+{
+    var origin = context.Request.Headers.Origin.ToString();
+
+    if (!string.IsNullOrEmpty(origin)
+        && !allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+    {
+        app.Logger.LogWarning(
+            "CORS: icazə verilməyən origin rədd edildi -> {Origin} (yol: {Path}). İcazəlilər: {Allowed}",
+            origin, context.Request.Path, string.Join(", ", allowedOrigins));
+    }
+
+    await next();
+});
+
 // API cavabları keşlənməməlidir. Əks halda CORS başlığı olmadan alınmış köhnə cavab
 // (məs. CORS konfiqurasiyasından əvvəl, ya da Origin başlığı olmayan sorğudan)
 // brauzer/CDN keşində qalır və sonrakı cross-origin sorğularda təkrar istifadə olunub
@@ -143,7 +182,13 @@ app.Use(async (context, next) =>
             context.Response.Headers.Pragma = "no-cache";
 
             // Keş yenə də saxlasa belə, cavabı Origin-ə görə ayırsın.
-            context.Response.Headers.Append(HeaderNames.Vary, HeaderNames.Origin);
+            // CORS middleware onsuz da əlavə edə bilir - təkrarlanmasın deyə yoxlayırıq.
+            var vary = context.Response.Headers.Vary;
+            if (!vary.Contains(HeaderNames.Origin, StringComparer.OrdinalIgnoreCase))
+            {
+                context.Response.Headers.Append(HeaderNames.Vary, HeaderNames.Origin);
+            }
+
             return Task.CompletedTask;
         });
     }

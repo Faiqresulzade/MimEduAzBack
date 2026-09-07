@@ -140,6 +140,28 @@ dotnet user-secrets set "Jwt:SecretKey" "<ən azı 32 simvol>"
 | `FileStorage:AllowedExtensions` | İcazə verilən formatlar (`.pdf`, `.docx`, `.pptx`) |
 | `Cors:AllowedOrigins` | Frontend origin-ləri (dev: `http://localhost:5173`) |
 
+### CORS problemi yaşayırsınızsa
+
+Brauzer CORS xətasında **səbəbi göstərmir** — həmişə ümumi "CORS error" yazır.
+Səbəb server loglarındadır:
+
+1. Tətbiq qalxarkən icazəli origin-lər loglanır:
+   `CORS icazə verilən origin-lər: https://mimedu.az, ...`
+2. İcazəsiz origin gələndə xəbərdarlıq yazılır:
+   `CORS: icazə verilməyən origin rədd edildi -> https://... (yol: /api/v1/...)`
+
+Origin **hərfi** müqayisə olunur — sxem, domen və port tam üst-üstə düşməlidir.
+`https://mimedu.az` ilə `https://www.mimedu.az` **fərqli origin-lərdir**, hər ikisi
+işlənəcəksə hər ikisi siyahıda olmalıdır. Sondakı `/` və artıq boşluqlar
+konfiqurasiya oxunarkən avtomatik təmizlənir.
+
+Origin-lər iki formatda verilə bilər:
+```
+Cors__AllowedOrigins=https://mimedu.az,https://www.mimedu.az    # vergüllə (rahat)
+Cors__AllowedOrigins__0=https://mimedu.az                        # indeksli
+Cors__AllowedOrigins__1=https://www.mimedu.az
+```
+
 ---
 
 ## Production bazası (Supabase PostgreSQL)
@@ -404,7 +426,7 @@ bura aid deyil. **Dockerfile ilə deploy edin:**
    | `Jwt__Issuer` | `https://<render-service-adı>.onrender.com` |
    | `Jwt__Audience` | frontend-in domeni, məs. `https://mimedu.az` |
    | `Jwt__SecretKey` | ən azı 32 simvollu təsadüfi mətn |
-   | `Cors__AllowedOrigins__0` | frontend-in tam origin-i (CORS üçün) |
+   | `Cors__AllowedOrigins` | frontend origin-ləri, vergüllə: `https://mimedu.az,https://www.mimedu.az` |
    | `Swagger__Enabled` | `true` — Swagger UI-ni production-da da açır (opsional, aşağıya bax) |
 
    `PORT` dəyişənini Render özü avtomatik verir — əlavə etməyə ehtiyac yoxdur,
