@@ -149,6 +149,49 @@ public sealed class ResourceService : IResourceService
         return resource.ToDetailDto();
     }
 
+    public async Task<ResourceDetailDto> CreateLinkAsync(CreateResourceLinkRequest request, CancellationToken ct)
+    {
+        var authorId = _currentUser.RequireUserId();
+
+        if (request.Type is not (ResourceType.Video or ResourceType.ExternalLink))
+        {
+            throw new ValidationFailedException(
+                "type", "Bu endpoint yalnız Video və ExternalLink tipləri üçündür; fayl əsaslı resurslar multipart ilə göndərilir.");
+        }
+
+        // Xarici linki ödənişli satmaq mənasızdır - link bir dəfə paylaşıldıqdan
+        // sonra ona nəzarət etmək mümkün deyil.
+        if (request.Type == ResourceType.ExternalLink && request.IsPaid)
+        {
+            throw new ValidationFailedException(
+                "isPaid", "Xarici link resursu yalnız pulsuz ola bilər. Ödənişli satış üçün video dərs və ya fayl yükləyin.");
+        }
+
+        var resource = new Resource
+        {
+            Name = request.Name.Trim(),
+            Subject = request.Subject.Trim(),
+            Grade = request.Grade,
+            Type = request.Type,
+            AuthorId = authorId,
+            IsPaid = request.IsPaid,
+            Price = request.IsPaid ? request.Price : 0m,
+            Status = ResourceStatus.Pending,
+            ExternalUrl = request.ExternalUrl.Trim(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Resources.Add(resource);
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Link əsaslı resurs yükləndi və moderasiyaya göndərildi. ResourceId: {ResourceId}, Tip: {Type}",
+            resource.Id, resource.Type);
+
+        resource.Author = await _db.Users.FirstOrDefaultAsync(u => u.Id == authorId, ct);
+        return resource.ToDetailDto();
+    }
+
     public async Task<ResourceDownloadDto> DownloadAsync(Guid id, CancellationToken ct)
     {
         var resource = await _db.Resources
@@ -180,6 +223,25 @@ public sealed class ResourceService : IResourceService
             }
         }
 
+        // Link əsaslı resursda fayl yoxdur - xarici ünvan qaytarılır.
+        if (resource.IsLinkBased)
+        {
+            if (string.IsNullOrWhiteSpace(resource.ExternalUrl))
+            {
+                throw new NotFoundException("Bu resursun linki mövcud deyil.");
+            }
+
+            resource.Downloads += 1;
+            await _db.SaveChangesAsync(ct);
+
+            return new ResourceDownloadDto(
+                resource.Id,
+                resource.Name,
+                resource.ExternalUrl,
+                IsExternal: true,
+                resource.Downloads);
+        }
+
         if (string.IsNullOrWhiteSpace(resource.FilePath))
         {
             throw new NotFoundException("Bu resursun faylı mövcud deyil.");
@@ -192,6 +254,7 @@ public sealed class ResourceService : IResourceService
             resource.Id,
             resource.OriginalFileName ?? Path.GetFileName(resource.FilePath),
             _files.GetPublicUrl(resource.FilePath),
+            IsExternal: false,
             resource.Downloads);
     }
 

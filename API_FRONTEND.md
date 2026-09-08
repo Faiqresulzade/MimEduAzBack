@@ -115,7 +115,7 @@ Publik. Default olaraq yalnız `Approved` statuslu resurslar qayıdır.
 |---|---|---|
 | `subject` | string | dəqiq uyğunluq, məs. `Riyaziyyat` |
 | `grade` | int | 1–11 |
-| `type` | `WorkSheet\|Presentation\|Test\|MethodGuide` | |
+| `type` | `WorkSheet\|Presentation\|Test\|MethodGuide\|Video\|ExternalLink` | |
 | `status` | `Pending\|Approved\|Rejected` | **yalnız Admin token-lə işləyir**, digərləri həmişə Approved görür |
 | `isPaid` | bool | |
 | `search` | string | ada görə axtarış, hərfə həssas deyil |
@@ -134,6 +134,7 @@ Publik. Default olaraq yalnız `Approved` statuslu resurslar qayıdır.
     price: number,               // AZN, pulsuzda 0
     status: "Approved",
     hasQuiz: boolean,
+    isLinkBased: boolean,        // Video / ExternalLink — faylı yoxdur
     createdAt, approvedAt: string | null
   }],
   page: number, pageSize: number, totalCount: number, totalPages: number
@@ -152,6 +153,8 @@ Publik (amma Pending/Rejected resurs yalnız müəllifi/admin görür — başqa
   rejectionReason: string | null,   // yalnız Rejected-də dolu
   hasQuiz: boolean, quizId: string | null,
   originalFileName: string | null,
+  isLinkBased: boolean,
+  externalUrl: string | null,   // yalnız PULSUZ link resurslarında dolu
   createdAt, approvedAt
 }
 ```
@@ -173,6 +176,8 @@ FormData:
   Price: number          // IsPaid=false olarsa 0-a məcburi çevrilir
   file: File             // PDF/DOCX/PPTX, maks. 25 MB
 ```
+⚠️ `Video` və `ExternalLink` bu endpoint-də **qəbul edilmir** (400) — onlar üçün
+aşağıdakı `POST /resources/link` istifadə olunur.
 ```ts
 // 201 Created — ResourceDetailDto (Status: "Pending")
 ```
@@ -196,13 +201,51 @@ await fetch(`${BASE}/resources`, {
 });
 ```
 
+### `POST /resources/link` 🔒 (yalnız Teacher / Admin)
+Fayl yükləmədən **link əsaslı** resurs yaradır — JSON, multipart deyil.
+
+| Tip | Nə üçün | Ödənişli ola bilər? |
+|---|---|---|
+| `Video` | YouTube/Vimeo video dərsi | ✅ Bəli |
+| `ExternalLink` | Başqa saytda hazırlanmış material (Wordwall, Canva, Drive...) | ❌ Yalnız pulsuz |
+
+```ts
+// Request
+{
+  name: string,
+  subject: string,
+  grade: number,                       // 1–11
+  type: "Video" | "ExternalLink",
+  externalUrl: string,                 // tam URL (http:// və ya https://)
+  isPaid?: boolean,                    // ExternalLink-də mütləq false
+  price?: number
+}
+// 201 Created — ResourceDetailDto (status: "Pending")
+```
+
+Xətalar: `400` (səhv URL / ödənişli `ExternalLink` / fayl tipi göndərilib), `403` (şagird).
+
+> **Niyə `ExternalLink` pulsuzdur:** link bir dəfə paylaşıldıqdan sonra ona nəzarət
+> etmək mümkün deyil. Ödənişli satış üçün video dərs və ya fayl yükləmə istifadə olunur.
+
+**Link necə açılır:**
+- **Pulsuz** resursda `externalUrl` birbaşa `GET /resources/{id}` cavabındadır — video-nu
+  dərhal embed edə bilərsiniz.
+- **Ödənişli** videoda `externalUrl` **null** gəlir. Link yalnız satın alandan sonra
+  `POST /resources/{id}/download` ilə alınır.
+
 ### `POST /resources/{id}/download`
-Endirmə sayını artırır və fayl linkini qaytarır. Pulsuz resurs üçün token lazım deyil.
+Endirmə/açılış sayını artırır və linki qaytarır. Pulsuz resurs üçün token lazım deyil.
 Ödənişli resurs üçün: token tələb olunur **və** həmin resurs əvvəlcə satın alınmalıdır (əks halda `403`).
 
 ```ts
 // 200 OK
-{ resourceId, fileName, downloadUrl: "/uploads/resources/...", downloads: number }
+{
+  resourceId, fileName,
+  downloadUrl: string,      // fayl yolu VƏ YA xarici link
+  isExternal: boolean,      // true → endirmə yox, yeni tabda aç
+  downloads: number
+}
 ```
 `downloadUrl` API origin-ə nisbətdir — tam linki `${API_ORIGIN}${downloadUrl}` kimi qurun (`/api/v1` prefiksi olmadan, çünki statik fayllar `wwwroot`-dan verilir).
 
@@ -468,6 +511,35 @@ Kod tapılmasa da `200` qaytarır, `isValid: false` ilə (404 yox!).
 }
 ```
 
+### `GET /certificates/{code}/download`
+**Publik.** Sertifikatın A4 (landşaft) sənədini endirir — QR kod və MIMEDU.AZ imzası ilə.
+
+| Query | Dəyər | Nəticə |
+|---|---|---|
+| `format` | `png` (default) | `image/png`, A4 landşaft, 150 DPI |
+| `format` | `pdf` | `application/pdf`, çap üçün |
+
+```
+GET /api/v1/certificates/MIM-2026-4417/download          → PNG
+GET /api/v1/certificates/MIM-2026-4417/download?format=pdf → PDF
+```
+
+Cavab fayl axınıdır (`Content-Disposition: attachment`), JSON deyil. Kod böyük/kiçik
+hərfə həssas deyil. Mövcud olmayan kod → `404` (standart xəta formatında).
+
+**Frontend nümunəsi:**
+```ts
+// Endirmə
+window.location.href = `${BASE}/certificates/${code}/download?format=pdf`;
+
+// Səhifədə göstərmək
+<img src={`${BASE}/certificates/${code}/download`} alt="Sertifikat" />
+```
+
+Sertifikatdakı QR kod `Certificate:VerificationUrlTemplate` konfiqurasiyasındakı ünvana
+aparır (default: `https://mimedu.az/sertifikat-yoxla/{code}`) — **bu marşrut frontend-də
+mövcud olmalıdır**, əks halda QR skan edən 404 alacaq.
+
 ### `POST /certificates/issue` 🔒 (yalnız Admin)
 ```ts
 { userFullName: string, trainingId: string }
@@ -616,7 +688,7 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 
 | Enum | Dəyərlər |
 |---|---|
-| `ResourceType` | `WorkSheet`, `Presentation`, `Test`, `MethodGuide` |
+| `ResourceType` | `WorkSheet`, `Presentation`, `Test`, `MethodGuide`, `Video`, `ExternalLink` |
 | `ResourceStatus` | `Pending`, `Approved`, `Rejected` |
 | `TrainingFormat` | `Live`, `Online`, `Video` |
 | `EnrollmentStatus` | `InProgress`, `Completed` |

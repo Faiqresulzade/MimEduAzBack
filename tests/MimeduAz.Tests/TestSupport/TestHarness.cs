@@ -80,3 +80,26 @@ public sealed class FakeFileStorageService : IFileStorageService
 
     public string GetPublicUrl(string filePath) => "/" + filePath;
 }
+
+/// <summary>
+/// Sertifikat renderini əvəz edən saxta servis — unit testlərdə real PNG/PDF
+/// yaradılmasına ehtiyac yoxdur, yalnız çağırıldığını yoxlamaq kifayətdir.
+/// </summary>
+public sealed class FakeCertificateDocumentService : ICertificateDocumentService
+{
+    public int RenderCount { get; private set; }
+    public CertificateDocumentFormat? LastFormat { get; private set; }
+
+    public CertificateDocument Render(
+        MimeduAz.Domain.Entities.Certificate certificate, CertificateDocumentFormat format)
+    {
+        RenderCount++;
+        LastFormat = format;
+
+        var isPdf = format == CertificateDocumentFormat.Pdf;
+        return new CertificateDocument(
+            new byte[] { 1, 2, 3 },
+            isPdf ? "application/pdf" : "image/png",
+            $"mimedu-sertifikat-{certificate.Code}.{(isPdf ? "pdf" : "png")}");
+    }
+}

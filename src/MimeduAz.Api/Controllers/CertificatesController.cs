@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MimeduAz.Application.Services;
+using MimeduAz.Application.Common.Interfaces;
 using MimeduAz.Contracts.Certificates;
 using MimeduAz.Contracts.Common;
 using MimeduAz.Domain.Constants;
@@ -33,6 +34,29 @@ public sealed class CertificatesController : ControllerBase
     [ProducesResponseType(typeof(CertificateVerificationDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<CertificateVerificationDto>> Verify(string code, CancellationToken ct) =>
         Ok(await _certificates.VerifyAsync(code, ct));
+
+    /// <summary>
+    /// Sertifikatın A4 ölçüsündə sənədini endirir. Doğrulama kimi publikdir —
+    /// işəgötürən kodu bilirsə sertifikatı yükləyib yoxlaya bilər.
+    /// </summary>
+    /// <param name="code">Sertifikat kodu, məs. <c>MIM-2026-4417</c>.</param>
+    /// <param name="format"><c>png</c> (default) və ya <c>pdf</c>.</param>
+    [HttpGet("{code}/download")]
+    [AllowAnonymous]
+    [Produces("image/png", "application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Download(
+        string code, [FromQuery] string format = "png", CancellationToken ct = default)
+    {
+        var documentFormat = format.Equals("pdf", StringComparison.OrdinalIgnoreCase)
+            ? CertificateDocumentFormat.Pdf
+            : CertificateDocumentFormat.Png;
+
+        var document = await _certificates.RenderAsync(code, documentFormat, ct);
+
+        return File(document.Content, document.ContentType, document.FileName);
+    }
 
     /// <summary>Təlim üçün əl ilə sertifikat verir. Yalnız Admin.</summary>
     [HttpPost("issue")]

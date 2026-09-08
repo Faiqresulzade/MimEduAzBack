@@ -25,7 +25,9 @@ public sealed class CreateResourceRequestValidator : AbstractValidator<CreateRes
             .InclusiveBetween(1, 11).WithMessage("Sinif 1 ilə 11 arasında olmalıdır.");
 
         RuleFor(x => x.Type)
-            .IsInEnum().WithMessage("Resurs növü düzgün deyil.");
+            .IsInEnum().WithMessage("Resurs növü düzgün deyil.")
+            .Must(t => t is not (ResourceType.Video or ResourceType.ExternalLink))
+            .WithMessage("Video və xarici link resursları fayl yükləmə ilə deyil, /resources/link endpoint-i ilə yaradılır.");
 
         RuleFor(x => x.Price)
             .GreaterThan(0).When(x => x.IsPaid)
@@ -172,5 +174,45 @@ public sealed class SaveTrainingLessonsRequestValidator : AbstractValidator<Save
 
         RuleFor(x => x.Lessons).NotEmpty().WithMessage("Ən azı bir dərs göndərilməlidir.");
         RuleForEach(x => x.Lessons).SetValidator(new CreateTrainingLessonRequestValidator());
+    }
+}
+
+public sealed class CreateResourceLinkRequestValidator : AbstractValidator<CreateResourceLinkRequest>
+{
+    public CreateResourceLinkRequestValidator()
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty().WithMessage("Resursun adı boş ola bilməz.")
+            .MaximumLength(200);
+
+        RuleFor(x => x.Subject)
+            .NotEmpty().WithMessage("Fənn seçilməlidir.")
+            .MaximumLength(100);
+
+        RuleFor(x => x.Grade)
+            .InclusiveBetween(1, 11).WithMessage("Sinif 1 ilə 11 arasında olmalıdır.");
+
+        RuleFor(x => x.Type)
+            .Must(t => t is ResourceType.Video or ResourceType.ExternalLink)
+            .WithMessage("Bu endpoint yalnız Video və ExternalLink tipləri üçündür.");
+
+        RuleFor(x => x.ExternalUrl)
+            .NotEmpty().WithMessage("Link boş ola bilməz.")
+            .MaximumLength(1000)
+            .Must(url => Uri.TryCreate(url, UriKind.Absolute, out var uri)
+                         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            .WithMessage("Link tam URL olmalıdır (http:// və ya https:// ilə).");
+
+        // Xarici link paylaşıldıqdan sonra nəzarət mümkün olmadığı üçün satıla bilməz.
+        RuleFor(x => x.IsPaid)
+            .Equal(false).When(x => x.Type == ResourceType.ExternalLink)
+            .WithMessage("Xarici link resursu yalnız pulsuz ola bilər.");
+
+        RuleFor(x => x.Price)
+            .GreaterThan(0).When(x => x.IsPaid)
+            .WithMessage("Ödənişli resursun qiyməti 0-dan böyük olmalıdır.");
+
+        RuleFor(x => x.Price)
+            .LessThanOrEqualTo(1000).WithMessage("Qiymət 1000 AZN-dən çox ola bilməz.");
     }
 }

@@ -110,6 +110,7 @@ public sealed class CertificateServiceTests
     private static CertificateService CreateSut(ApplicationDbContext db) => new(
         db,
         new FakeCurrentUserService(TeacherId),
+        new FakeCertificateDocumentService(),
         TestHarness.Logger<CertificateService>());
 
     private static async Task<Training> SeedTrainingWithEnrollmentAsync(ApplicationDbContext db)

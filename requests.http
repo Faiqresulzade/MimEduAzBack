@@ -660,3 +660,100 @@ Content-Type: {{contentType}}
     }
   ]
 }
+
+
+###############################################################################
+# 11. VİDEO / XARİCİ LİNK RESURSLARI
+###############################################################################
+
+### 11.1 Video dərs yarat (ödənişli ola bilər) — fayl yox, link
+# @name videoRes
+POST {{baseUrl}}/api/v1/resources/link
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Kəsrlər üzrə video dərs",
+  "subject": "Riyaziyyat",
+  "grade": 5,
+  "type": "Video",
+  "externalUrl": "https://www.youtube.com/watch?v=kesrler-dersi",
+  "isPaid": true,
+  "price": 5
+}
+
+### 11.2 Pulsuz video (linki cavabda dərhal gəlir — embed üçün)
+POST {{baseUrl}}/api/v1/resources/link
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Həndəsəyə giriş — pulsuz video",
+  "subject": "Riyaziyyat",
+  "grade": 7,
+  "type": "Video",
+  "externalUrl": "https://vimeo.com/123456"
+}
+
+### 11.3 Xarici resurs (Wordwall və s.) — yalnız pulsuz
+# @name extRes
+POST {{baseUrl}}/api/v1/resources/link
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Wordwall interaktiv oyun",
+  "subject": "Riyaziyyat",
+  "grade": 5,
+  "type": "ExternalLink",
+  "externalUrl": "https://wordwall.net/az/resource/1"
+}
+
+### 11.4 Ödənişli xarici link — 400 gözlənilir
+POST {{baseUrl}}/api/v1/resources/link
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Ödənişli olmamalıdır",
+  "subject": "Riyaziyyat",
+  "grade": 5,
+  "type": "ExternalLink",
+  "externalUrl": "https://wordwall.net/az/resource/2",
+  "isPaid": true,
+  "price": 3
+}
+
+### 11.5 Səhv URL — 400 gözlənilir
+POST {{baseUrl}}/api/v1/resources/link
+Authorization: Bearer {{teacherToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Səhv link",
+  "subject": "Riyaziyyat",
+  "grade": 5,
+  "type": "Video",
+  "externalUrl": "bu-link-deyil"
+}
+
+### 11.6 Admin təsdiqləyir
+POST {{baseUrl}}/api/v1/admin/resources/{{extRes.response.body.id}}/approve
+Authorization: Bearer {{adminToken}}
+
+### 11.7 Linki aç (isExternal: true → yeni tabda açılmalı)
+POST {{baseUrl}}/api/v1/resources/{{extRes.response.body.id}}/download
+
+
+###############################################################################
+# 12. SERTİFİKAT SƏNƏDİ (A4 PNG / PDF)
+###############################################################################
+
+### 12.1 PNG endir (publik — token lazım deyil)
+GET {{baseUrl}}/api/v1/certificates/MIM-2026-4417/download
+
+### 12.2 PDF endir
+GET {{baseUrl}}/api/v1/certificates/MIM-2026-4417/download?format=pdf
+
+### 12.3 Mövcud olmayan kod — 404 gözlənilir
+GET {{baseUrl}}/api/v1/certificates/MIM-2026-0000/download

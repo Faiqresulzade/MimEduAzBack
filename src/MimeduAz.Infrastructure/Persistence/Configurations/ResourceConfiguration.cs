@@ -21,6 +21,10 @@ public sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
         builder.Property(r => r.FilePath).HasMaxLength(500);
         builder.Property(r => r.OriginalFileName).HasMaxLength(260);
         builder.Property(r => r.RejectionReason).HasMaxLength(1000);
+        builder.Property(r => r.ExternalUrl).HasMaxLength(1000);
+
+        // Hesablanan xassədir - sütunu yoxdur.
+        builder.Ignore(r => r.IsLinkBased);
 
         builder.HasOne(r => r.Author)
             .WithMany(u => u.Resources)

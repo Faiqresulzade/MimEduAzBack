@@ -168,7 +168,7 @@ public sealed class QuizServiceTests
     private static QuizService CreateSut(ApplicationDbContext db, Guid? userId)
     {
         var currentUser = new FakeCurrentUserService(userId);
-        var certificates = new CertificateService(db, currentUser, TestHarness.Logger<CertificateService>());
+        var certificates = new CertificateService(db, currentUser, new FakeCertificateDocumentService(), TestHarness.Logger<CertificateService>());
         return new QuizService(db, currentUser, certificates, TestHarness.Logger<QuizService>());
     }
 

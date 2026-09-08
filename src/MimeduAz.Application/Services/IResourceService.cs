@@ -22,6 +22,12 @@ public interface IResourceService
     Task<PagedResult<ResourceDto>> GetAsync(ResourceQuery query, CancellationToken ct);
     Task<ResourceDetailDto> GetByIdAsync(Guid id, CancellationToken ct);
     Task<ResourceDetailDto> CreateAsync(CreateResourceRequest request, ResourceFileUpload file, CancellationToken ct);
+
+    /// <summary>
+    /// Fayl yüklənmədən link əsaslı resurs yaradır (video dərs və ya xarici material).
+    /// Digər tiplər kimi moderasiyaya (Pending) düşür.
+    /// </summary>
+    Task<ResourceDetailDto> CreateLinkAsync(CreateResourceLinkRequest request, CancellationToken ct);
     Task<ResourceDownloadDto> DownloadAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<ResourceDto>> GetMineAsync(CancellationToken ct);
     Task<AuthorProfileDto> GetAuthorProfileAsync(Guid authorId, CancellationToken ct);

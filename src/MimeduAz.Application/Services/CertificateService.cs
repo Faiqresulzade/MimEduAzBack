@@ -17,15 +17,18 @@ public sealed class CertificateService : ICertificateService
 
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
+    private readonly ICertificateDocumentService _documents;
     private readonly ILogger<CertificateService> _logger;
 
     public CertificateService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
+        ICertificateDocumentService documents,
         ILogger<CertificateService> logger)
     {
         _db = db;
         _currentUser = currentUser;
+        _documents = documents;
         _logger = logger;
     }
 
@@ -221,6 +224,21 @@ public sealed class CertificateService : ICertificateService
         certificate.User = enrollment.User;
         certificate.Training = training;
         return certificate.ToDto();
+    }
+
+    public async Task<CertificateDocument> RenderAsync(
+        string code, CertificateDocumentFormat format, CancellationToken ct)
+    {
+        var normalized = (code ?? string.Empty).Trim().ToUpperInvariant();
+
+        var certificate = await _db.Certificates
+            .AsNoTracking()
+            .Include(c => c.User)
+            .Include(c => c.Training)
+            .FirstOrDefaultAsync(c => c.Code.ToUpper() == normalized, ct)
+            ?? throw new NotFoundException($"«{normalized}» kodlu sertifikat tapılmadı.");
+
+        return _documents.Render(certificate, format);
     }
 
     private static string BuildTrainingDescription(string fullName, string trainingName, int hours, DateTime issuedAt) =>

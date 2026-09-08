@@ -96,7 +96,26 @@ public sealed class ResourcesController : ControllerBase
     }
 
     /// <summary>
+    /// Fayl yükləmədən link əsaslı resurs yaradır: video dərs (YouTube/Vimeo) və ya
+    /// başqa saytda hazırlanmış material. Digər resurslar kimi moderasiyaya düşür.
+    /// <c>ExternalLink</c> tipi yalnız pulsuz ola bilər, <c>Video</c> ödənişli də ola bilər.
+    /// </summary>
+    [HttpPost("link")]
+    [Authorize(Roles = AppRoles.AuthorRoles)]
+    [ProducesResponseType(typeof(ResourceDetailDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ResourceDetailDto>> CreateLink(
+        CreateResourceLinkRequest request, CancellationToken ct)
+    {
+        var created = await _resources.CreateLinkAsync(request, ct);
+        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+    }
+
+    /// <summary>
     /// Resursu endirir: endirmə sayını artırır və fayl linkini qaytarır.
+    /// Link əsaslı resurslarda fayl yerinə xarici ünvan qayıdır (<c>isExternal: true</c>) —
+    /// bu halda link endirilməməli, yeni tabda açılmalıdır.
     /// Ödənişli resurs üçün əvvəlcədən satın alınma tələb olunur.
     /// </summary>
     [HttpPost("{id:guid}/download")]

@@ -35,6 +35,15 @@ public class Resource
     /// <summary>İstifadəçinin yüklədiyi orijinal fayl adı (endirmə zamanı qaytarılır).</summary>
     public string? OriginalFileName { get; set; }
 
+    /// <summary>
+    /// Video və xarici link resurslarında materialın ünvanı. Fayl əsaslı tiplərdə null.
+    /// Ödənişli video üçün bu link yalnız satın alandan sonra açılır.
+    /// </summary>
+    public string? ExternalUrl { get; set; }
+
+    /// <summary>Materialın faylı yox, xarici linki varmı.</summary>
+    public bool IsLinkBased => Type is ResourceType.Video or ResourceType.ExternalLink;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ApprovedAt { get; set; }
 

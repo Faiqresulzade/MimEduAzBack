@@ -105,10 +105,11 @@ MimeduAz.sln
 │   ├── MimeduAz.Infrastructure/  # EF Core DbContext, konfiqurasiyalar, migrations, JWT, fayl saxlama
 │   └── MimeduAz.Api/             # Controller-lər, middleware, Swagger, Program.cs
 ├── tests/
-│   └── MimeduAz.Tests/           # Biznes məntiq üzrə unit testlər (52 test)
+│   └── MimeduAz.Tests/           # Biznes məntiq üzrə unit testlər (60 test)
 ├── scripts/
 │   ├── smoke-test.mjs            # Ümumi uçdan-uca yoxlama (100 assertion)
-│   └── student-flow-test.mjs     # Şagird axını: təlim al → bax → tamamla (41 assertion)
+│   ├── student-flow-test.mjs     # Şagird axını: təlim al → bax → tamamla (41 assertion)
+│   └── link-and-certificate-test.mjs  # Video/xarici link + sertifikat sənədi (32 assertion)
 ├── docker-compose.yml            # Local PostgreSQL
 └── requests.http                 # Manual API testləri
 ```
@@ -143,6 +144,9 @@ dotnet user-secrets set "Jwt:SecretKey" "<ən azı 32 simvol>"
 | `FileStorage:MaxFileSizeBytes` | Maksimum fayl ölçüsü (default 25 MB) |
 | `FileStorage:AllowedExtensions` | İcazə verilən formatlar (`.pdf`, `.docx`, `.pptx`) |
 | `Cors:AllowedOrigins` | Frontend origin-ləri (dev: `http://localhost:5173`) |
+| `Certificate:VerificationUrlTemplate` | Sertifikat QR kodunun apardığı ünvan (`{code}` əvəz olunur) |
+| `Certificate:SignatureName` / `SignatureTitle` | İmza xəttinin altındakı ad və vəzifə |
+| `Certificate:PngDpi` | Sertifikat PNG-nin sıxlığı (default 150) |
 
 ### CORS problemi yaşayırsınızsa
 
@@ -226,13 +230,22 @@ ASPNETCORE_ENVIRONMENT=Development dotnet ef database update -p src/MimeduAz.Inf
    təsdiqlənməmiş resursu görə bilir.
 3. **Kodlar** — sifariş `MIM-XXXX`, sertifikat `MIM-YYYY-XXXX` formatında, unikallıq
    DB yoxlanışı ilə təmin olunur (təkrar zamanı 6 rəqəmli suffiksə keçir).
-4. **Quiz** — keçid balı default 70%, hər quiz üçün ayrıca təyin oluna bilər.
+4. **Sertifikat sənədi** — A4 (landşaft) PNG və ya PDF kimi endirilir
+   (`GET /certificates/{code}/download?format=png|pdf`). Üzərində doğrulama ünvanına
+   aparan QR kod, sertifikat kodu və MIMEDU.AZ imzası var. Şrift layihəyə əlavə olunub
+   (`Noto Sans`) — sistem şriftlərində Azərbaycan «ə» hərfi olmaya bilər, konteynerdə isə
+   ümumiyyətlə şrift yoxdur. Nümunə: `docs/sertifikat-numune.png`.
+5. **Link əsaslı resurslar** — `Video` (YouTube/Vimeo) və `ExternalLink` (başqa saytdakı
+   material) tipləri fayl tələb etmir, `POST /resources/link` ilə yaradılır.
+   `ExternalLink` **yalnız pulsuz** ola bilər (link paylaşıldıqdan sonra nəzarət mümkün
+   deyil); `Video` ödənişli ola bilər və linki yalnız satın alandan sonra açılır.
+6. **Quiz** — keçid balı default 70%, hər quiz üçün ayrıca təyin oluna bilər.
    Keçid balı toplananda **avtomatik sertifikat** yaradılır (eyni cəhd üçün idempotent).
    `correctOptionIndex` heç vaxt API cavabına düşmür.
-5. **Fayl yükləmə** — PDF/DOCX/PPTX, maks. 25 MB, `IFileStorageService` abstraksiyası
+7. **Fayl yükləmə** — PDF/DOCX/PPTX, maks. 25 MB, `IFileStorageService` abstraksiyası
    arxasında. Local implementasiya `wwwroot/uploads/resources/{guid}-{ad}` yolunda saxlayır
    və path traversal-a qarşı yoxlama aparır.
-6. **Ödəniş** — tam demo. Checkout xarici provayderə müraciət etmir, kart sahələri
+8. **Ödəniş** — tam demo. Checkout xarici provayderə müraciət etmir, kart sahələri
    qəbul edilmir. Səbət sifarişə çevrilir, təlim sətirləri üçün `Enrollment` yaradılır,
    səbət boşaldılır — hamısı tək `SaveChanges` çağırışında atomik icra olunur.
 
@@ -364,6 +377,7 @@ Bütün endpoint-lər `/api/v1/` prefiksi ilə.
 | GET | `/resources` | Publik (filtr: `subject`, `grade`, `type`, `isPaid`, `search`, `page`, `pageSize`) |
 | GET | `/resources/{id}` | Publik |
 | POST | `/resources` | **Teacher / Admin** (multipart/form-data) |
+| POST | `/resources/link` | **Teacher / Admin** (video / xarici link) |
 | POST | `/resources/{id}/download` | Publik (ödənişli üçün satın alma tələb olunur) |
 | GET | `/resources/mine` | Authorize |
 | GET | `/resources/author/{userId}` | Publik |
@@ -402,6 +416,7 @@ Bütün endpoint-lər `/api/v1/` prefiksi ilə.
 |---|---|---|
 | GET | `/certificates/mine` | Authorize |
 | GET | `/certificates/verify/{code}` | **Publik** |
+| GET | `/certificates/{code}/download` | **Publik** (PNG / PDF) |
 | POST | `/certificates/issue` | Admin |
 
 ### Admin

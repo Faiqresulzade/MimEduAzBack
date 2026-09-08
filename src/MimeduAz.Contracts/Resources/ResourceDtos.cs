@@ -16,6 +16,8 @@ public sealed record ResourceDto(
     decimal Price,
     ResourceStatus Status,
     bool HasQuiz,
+    /// <summary>Fayl yox, xarici link əsaslıdır (Video / ExternalLink).</summary>
+    bool IsLinkBased,
     DateTime CreatedAt,
     DateTime? ApprovedAt);
 
@@ -37,6 +39,12 @@ public sealed record ResourceDetailDto(
     bool HasQuiz,
     Guid? QuizId,
     string? OriginalFileName,
+    bool IsLinkBased,
+    /// <summary>
+    /// Yalnız PULSUZ link resurslarında doldurulur (məs. video embed üçün).
+    /// Ödənişli videoda null qalır - link "download" endpoint-i ilə alınır.
+    /// </summary>
+    string? ExternalUrl,
     DateTime CreatedAt,
     DateTime? ApprovedAt);
 
@@ -58,7 +66,12 @@ public sealed record ResourceFileUpload(Stream Content, string FileName, long Le
 public sealed record ResourceDownloadDto(
     Guid ResourceId,
     string FileName,
+    /// <summary>
+    /// Fayl resurslarında serverdəki fayl yolu, link resurslarında isə xarici ünvan.
+    /// <see cref="IsExternal"/> true olanda yeni tabda açılmalıdır, endirilməməlidir.
+    /// </summary>
     string DownloadUrl,
+    bool IsExternal,
     int Downloads);
 
 /// <summary>Müəllif profili (ictimai).</summary>
@@ -69,3 +82,25 @@ public sealed record AuthorProfileDto(
     int ResourceCount,
     int TotalDownloads,
     IReadOnlyList<ResourceDto> Resources);
+
+/// <summary>
+/// Fayl yüklənmədən link əsaslı resurs yaratmaq (video dərs və ya xarici material).
+/// Fayl əsaslı tiplər üçün multipart endpoint istifadə olunur.
+/// </summary>
+public sealed class CreateResourceLinkRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string Subject { get; set; } = string.Empty;
+    public int Grade { get; set; }
+
+    /// <summary>Yalnız <c>Video</c> və ya <c>ExternalLink</c> ola bilər.</summary>
+    public ResourceType Type { get; set; } = ResourceType.Video;
+
+    /// <summary>Materialın ünvanı (http/https).</summary>
+    public string ExternalUrl { get; set; } = string.Empty;
+
+    /// <summary><c>ExternalLink</c> tipində həmişə false olmalıdır.</summary>
+    public bool IsPaid { get; set; }
+
+    public decimal Price { get; set; }
+}

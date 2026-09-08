@@ -1,3 +1,4 @@
+using MimeduAz.Application.Common.Interfaces;
 using MimeduAz.Contracts.Certificates;
 
 namespace MimeduAz.Application.Services;
@@ -23,4 +24,10 @@ public interface ICertificateService
     /// üçün təkrar çağırılarsa mövcud sertifikatı qaytarır (idempotent).
     /// </summary>
     Task<CertificateDto> IssueForTrainingCompletionAsync(Guid enrollmentId, CancellationToken ct);
+
+    /// <summary>
+    /// Sertifikatın endirilə bilən sənədini (A4 PNG və ya PDF) qaytarır.
+    /// Doğrulama kimi publikdir - işəgötürən sertifikatı yükləyib yoxlaya bilsin.
+    /// </summary>
+    Task<CertificateDocument> RenderAsync(string code, CertificateDocumentFormat format, CancellationToken ct);
 }

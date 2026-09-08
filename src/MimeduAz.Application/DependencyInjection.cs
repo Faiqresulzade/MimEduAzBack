@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.Configure<CommissionOptions>(configuration.GetSection(CommissionOptions.SectionName));
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.Configure<RequestLogOptions>(configuration.GetSection(RequestLogOptions.SectionName));
+        services.Configure<CertificateOptions>(configuration.GetSection(CertificateOptions.SectionName));
 
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
 

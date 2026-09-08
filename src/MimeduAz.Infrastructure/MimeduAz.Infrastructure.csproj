@@ -16,11 +16,20 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+    <PackageReference Include="QuestPDF" Version="2024.12.3" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.8" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\MimeduAz.Application\MimeduAz.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Sertifikat renderi üçün şriftlər. Sistem şriftlərinə güvənmirik:
+         Linux konteynerində şrift yoxdur, Windows şriftlərini isə paylamaq olmaz. -->
+    <EmbeddedResource Include="Certificates\Fonts\*.ttf" />
   </ItemGroup>
 
 </Project>

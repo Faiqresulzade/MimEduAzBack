@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using MimeduAz.Application.Common.Interfaces;
 using MimeduAz.Application.Common.Options;
 using MimeduAz.Domain.Entities;
+using MimeduAz.Infrastructure.Certificates;
 using MimeduAz.Infrastructure.Identity;
 using MimeduAz.Infrastructure.Logging;
 using MimeduAz.Infrastructure.Persistence;
@@ -53,6 +54,9 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<ApplicationDbContext>();
 
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+
+        // Sertifikat renderi vəziyyət saxlamır - singleton kifayətdir.
+        services.AddSingleton<ICertificateDocumentService, CertificateDocumentService>();
 
         services.AddScoped<IFileStorageService>(sp => new LocalFileStorageService(
             sp.GetRequiredService<IOptions<FileStorageOptions>>(),

@@ -18,6 +18,7 @@ public static class ResourceMappings
         r.Price,
         r.Status,
         r.Quiz is not null,
+        r.IsLinkBased,
         r.CreatedAt,
         r.ApprovedAt);
 
@@ -38,6 +39,10 @@ public static class ResourceMappings
         r.Quiz is not null,
         r.Quiz?.Id,
         r.OriginalFileName,
+        r.IsLinkBased,
+        // Ödənişli videonun linki detal cavabında verilmir - satın almadan sonra
+        // "download" endpoint-i ilə alınır.
+        r.IsLinkBased && !r.IsPaid ? r.ExternalUrl : null,
         r.CreatedAt,
         r.ApprovedAt);
 }
