@@ -235,6 +235,10 @@ public sealed class CertificateService : ICertificateService
             .AsNoTracking()
             .Include(c => c.User)
             .Include(c => c.Training)
+            // İmtahan sertifikatında resursun adı və nəticə faizi sənəddə göstərilir.
+            .Include(c => c.ResourceQuizAttempt)!
+                .ThenInclude(a => a!.Quiz)!
+                    .ThenInclude(q => q!.Resource)
             .FirstOrDefaultAsync(c => c.Code.ToUpper() == normalized, ct)
             ?? throw new NotFoundException($"«{normalized}» kodlu sertifikat tapılmadı.");
 

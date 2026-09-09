@@ -1,6 +1,6 @@
 # Video/xarici link resursları və sertifikat sənədi — dəyişiklik sənədi
 
-**Commit:** `2789420` · **Tarix:** 2026-09-08
+**Tarix:** 2026-09-09 · Sertifikat dizaynı MİM-in mövcud sertifikatına uyğunlaşdırıldı
 
 Bu sənəd yalnız **bu dəyişikliyi** əhatə edir. Tam API bələdçisi üçün
 [`API_FRONTEND.md`](./API_FRONTEND.md), əvvəlki dəyişiklik üçün
@@ -14,7 +14,7 @@ Bu sənəd yalnız **bu dəyişikliyi** əhatə edir. Tam API bələdçisi üç�
 |---|---|---|
 | 1 | **Video dərs tipi** | Fayl yüklənmir, YouTube/Vimeo linki saxlanılır. Ödənişli ola bilər. |
 | 2 | **Xarici resurs tipi** | Başqa saytda hazırlanmış material (Wordwall, Canva, Drive...). Yalnız pulsuz. |
-| 3 | **Sertifikat sənədi** | A4 landşaft PNG və PDF, QR kod və MIMEDU.AZ imzası ilə, endirilə bilən. |
+| 3 | **Sertifikat sənədi** | A4 landşaft PNG və PDF; ad-soyad, təlim, QR kod və direktor imzası ilə. |
 
 ---
 
@@ -175,11 +175,33 @@ Kod böyük/kiçik hərfə həssas deyil. Mövcud olmayan kod → `404` (standar
 
 ### Sertifikatın üzərində nə var
 
-- MIMEDU.AZ loqosu və alt yazı
-- «SERTİFİKAT» başlığı, qızılı ikiqat haşiyə
-- Sahibin adı, təlimin adı, saat sayı, verilmə tarixi
-- **Sol aşağı:** doğrulama ünvanına aparan QR kod + sertifikat kodu
-- **Sağ aşağı:** stilizasiya olunmuş MIMEDU.AZ imzası + «Platforma rəhbərliyi»
+Dizayn Müəllimlərin İnkişaf Mərkəzinin mövcud sertifikatı əsas götürülərək quruldu:
+
+- Tünd göy haşiyə + qızılı daxili xətt
+- Emblem və **MÜƏLLİMLƏRİN İNKİŞAF MƏRKƏZİ** yazısı
+- «SERTİFİKAT» başlığı
+- **Sahibin adı və soyadı** (backend-dən: `certificate.User.FullName`)
+- «Təlimin adı» + saat sayı → «təltif edilir»
+- **Sol aşağı:** QR kod, sertifikat kodu, verilmə tarixi
+- **Sağ aşağı:** imza, «Müəllimlərin İnkişaf Mərkəzinin Direktoru — VƏFA KƏRİMLİ»
+
+**Backend-dən dolan sahələr:** ad-soyad, təlim adı və saatı, tarix, sertifikat kodu, QR kod.
+İmtahan sertifikatında təlim yerinə resursun adı və nəticə faizi yazılır.
+
+### Loqo, möhür və imza şəkilləri
+
+Hazırda emblem mətnlə (`MİM`) çəkilir, möhür isə ümumiyyətlə çəkilmir — **saxta möhür
+şəkli çəkməkdənsə boş buraxmaq daha düzgündür**. Real şəkilləri verdikdə avtomatik
+istifadə olunacaq:
+
+| Konfiqurasiya | Nə üçün |
+|---|---|
+| `Certificate__LogoPath` | Loqo şəkli (PNG, şəffaf fon) |
+| `Certificate__StampPath` | Möhür/ştamp şəkli |
+| `Certificate__SignatureImagePath` | Əl yazısı imza şəkli |
+
+Yol `wwwroot`-a nisbətən və ya mütləq ola bilər. Fayl tapılmasa render **sınmır** —
+sadəcə həmin element buraxılır.
 
 Nümunə: [`docs/sertifikat-numune.png`](./docs/sertifikat-numune.png)
 

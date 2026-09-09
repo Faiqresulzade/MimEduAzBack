@@ -145,7 +145,12 @@ dotnet user-secrets set "Jwt:SecretKey" "<ən azı 32 simvol>"
 | `FileStorage:AllowedExtensions` | İcazə verilən formatlar (`.pdf`, `.docx`, `.pptx`) |
 | `Cors:AllowedOrigins` | Frontend origin-ləri (dev: `http://localhost:5173`) |
 | `Certificate:VerificationUrlTemplate` | Sertifikat QR kodunun apardığı ünvan (`{code}` əvəz olunur) |
-| `Certificate:SignatureName` / `SignatureTitle` | İmza xəttinin altındakı ad və vəzifə |
+| `Certificate:OrganizationName` | Sertifikatın başındakı təşkilat adı |
+| `Certificate:OrganizationShortName` | Loqo şəkli yoxdursa emblemdəki qısa hərflər (məs. `MİM`) |
+| `Certificate:SignatureTitle` / `SignatureName` | İmza blokundakı vəzifə və ad |
+| `Certificate:LogoPath` | Loqo şəkli (opsional). Boşdursa mətn emblemi çəkilir |
+| `Certificate:StampPath` | Möhür şəkli (opsional). Boşdursa möhür çəkilmir |
+| `Certificate:SignatureImagePath` | Əl imzası şəkli (opsional). Boşdursa ad kursivlə yazılır |
 | `Certificate:PngDpi` | Sertifikat PNG-nin sıxlığı (default 150) |
 
 ### CORS problemi yaşayırsınızsa

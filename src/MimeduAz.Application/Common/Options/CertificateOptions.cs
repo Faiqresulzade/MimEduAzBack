@@ -10,11 +10,31 @@ public sealed class CertificateOptions
     /// </summary>
     public string VerificationUrlTemplate { get; set; } = "https://mimedu.az/sertifikat-yoxla/{code}";
 
-    /// <summary>İmza xəttinin altında yazılan ad/qurum.</summary>
-    public string SignatureName { get; set; } = "MIMEDU.AZ";
+    /// <summary>Sertifikatın başında yazılan təşkilat adı.</summary>
+    public string OrganizationName { get; set; } = "MÜƏLLİMLƏRİN İNKİŞAF MƏRKƏZİ";
 
-    /// <summary>İmza xəttinin altında yazılan vəzifə.</summary>
-    public string SignatureTitle { get; set; } = "Platforma rəhbərliyi";
+    /// <summary>Loqo əvəzinə emblemdə göstərilən qısa hərflər (loqo şəkli verilməyibsə).</summary>
+    public string OrganizationShortName { get; set; } = "MİM";
+
+    /// <summary>İmza xəttinin üstündə yazılan vəzifə.</summary>
+    public string SignatureTitle { get; set; } = "Müəllimlərin İnkişaf Mərkəzinin Direktoru";
+
+    /// <summary>İmza sahibinin adı.</summary>
+    public string SignatureName { get; set; } = "VƏFA KƏRİMLİ";
+
+    /// <summary>
+    /// Loqo şəklinin yolu (wwwroot-a nisbətən və ya mütləq). Boşdursa mətn emblemi çəkilir.
+    /// </summary>
+    public string? LogoPath { get; set; }
+
+    /// <summary>
+    /// Möhür/ştamp şəklinin yolu. Boşdursa möhür bölməsi ümumiyyətlə çəkilmir —
+    /// saxta möhür şəkli çəkməkdənsə boş buraxmaq daha düzgündür.
+    /// </summary>
+    public string? StampPath { get; set; }
+
+    /// <summary>İmza xəttinin üstündəki əl yazısı görüntüsü. Boşdursa mətn imzası yazılır.</summary>
+    public string? SignatureImagePath { get; set; }
 
     /// <summary>PNG üçün render sıxlığı. 150 ekran+çap üçün balanslı ölçü verir.</summary>
     public int PngDpi { get; set; } = 150;
