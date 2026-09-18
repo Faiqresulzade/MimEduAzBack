@@ -20,10 +20,21 @@ public sealed class AdminController : ControllerBase
 
     public AdminController(IAdminService admin) => _admin = admin;
 
-    /// <summary>Moderasiya növbəsi — təsdiq gözləyən resurslar.</summary>
+    /// <summary>
+    /// Admin panelinin icmalı: sorğu və xəta sayları, məzmun, təlim və satış göstəriciləri.
+    /// </summary>
+    [HttpGet("dashboard")]
+    [ProducesResponseType(typeof(AdminDashboardDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AdminDashboardDto>> Dashboard(CancellationToken ct) =>
+        Ok(await _admin.GetDashboardAsync(ct));
+
+    /// <summary>
+    /// Moderasiya növbəsi — təsdiq gözləyən resurslar. Cavabda tam detal gəlir:
+    /// video/xarici link və fayl adı da daxil, moderator materialı görmədən qərar verməsin deyə.
+    /// </summary>
     [HttpGet("resources/pending")]
-    [ProducesResponseType(typeof(IReadOnlyList<ResourceDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<ResourceDto>>> PendingResources(CancellationToken ct) =>
+    [ProducesResponseType(typeof(IReadOnlyList<ResourceDetailDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ResourceDetailDto>>> PendingResources(CancellationToken ct) =>
         Ok(await _admin.GetPendingResourcesAsync(ct));
 
     /// <summary>Resursu təsdiqləyir — Resurs Bankında ictimai görünür.</summary>

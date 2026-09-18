@@ -7,6 +7,15 @@ public interface ITrainingService
     Task<IReadOnlyList<TrainingDto>> GetAsync(CancellationToken ct);
     Task<TrainingDetailDto> GetByIdAsync(Guid id, CancellationToken ct);
     Task<TrainingDetailDto> CreateAsync(CreateTrainingRequest request, CancellationToken ct);
+    /// <summary>Təlimin məlumatlarını yeniləyir. Yalnız Admin.</summary>
+    Task<TrainingDetailDto> UpdateAsync(Guid id, UpdateTrainingRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Təlimi silir. Qeydiyyatı olan təlim silinmir - əks halda istifadəçilərin
+    /// aldığı məzmun və sertifikat tarixçəsi arxasınca silinərdi.
+    /// </summary>
+    Task DeleteAsync(Guid id, CancellationToken ct);
+
     Task<IReadOnlyList<MyTrainingDto>> GetMineAsync(CancellationToken ct);
 
     /// <summary>

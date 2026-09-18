@@ -26,10 +26,17 @@ public sealed class RequestLogQuery
 public interface IAdminService
 {
     Task<PagedResult<RequestLogDto>> GetRequestLogsAsync(RequestLogQuery query, CancellationToken ct);
-    Task<IReadOnlyList<ResourceDto>> GetPendingResourcesAsync(CancellationToken ct);
+    /// <summary>
+    /// Moderasiya növbəsi. Detal DTO qaytarılır ki, moderator təsdiqdən əvvəl
+    /// video/xarici linki və fayl adını görə bilsin.
+    /// </summary>
+    Task<IReadOnlyList<ResourceDetailDto>> GetPendingResourcesAsync(CancellationToken ct);
     Task<ResourceDetailDto> ApproveResourceAsync(Guid resourceId, CancellationToken ct);
     Task<ResourceDetailDto> RejectResourceAsync(Guid resourceId, RejectResourceRequest request, CancellationToken ct);
     Task<IReadOnlyList<AdminUserDto>> GetUsersAsync(CancellationToken ct);
     Task<SalesSummaryDto> GetSalesAsync(CancellationToken ct);
     Task<IReadOnlyList<OrderDto>> GetOrdersAsync(CancellationToken ct);
+
+    /// <summary>Admin panelinin baş səhifəsi üçün bütün icmal göstəriciləri.</summary>
+    Task<AdminDashboardDto> GetDashboardAsync(CancellationToken ct);
 }

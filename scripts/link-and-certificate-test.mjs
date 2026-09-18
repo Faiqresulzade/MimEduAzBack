@@ -77,7 +77,9 @@ async function main() {
   check('Tip Video-dur', video.body?.type === 'Video');
   check('isLinkBased = true', video.body?.isLinkBased === true);
   check('Moderasiyaya düşür (Pending)', video.body?.status === 'Pending');
-  check('Ödənişlidə link cavabda GİZLİDİR', video.body?.externalUrl === null,
+  // Müəllif öz ödənişli linkini yaratdığı andan görməlidir - əks halda öz
+  // materialını yoxlaya bilməzdi. Yalnız kənar istifadəçilərdən gizlədilir.
+  check('Müəllif öz linkini görür', video.body?.externalUrl === 'https://www.youtube.com/watch?v=kesrler-dersi',
     `externalUrl=${video.body?.externalUrl}`);
 
   const freeVideo = await call('POST', '/resources/link', {
@@ -157,6 +159,13 @@ async function main() {
   check('Xarici ünvan qayıdır',
     openExternal.body?.downloadUrl === 'https://wordwall.net/az/resource/1');
   check('Açılış sayğacı artır', openExternal.body?.downloads === 1);
+
+  // Moderator təsdiqdən əvvəl ödənişli videonun linkini görməlidir,
+  // əks halda materialı yoxlamadan kor-koranə təsdiqləmək məcburiyyətində qalar.
+  const pending = await call('GET', '/admin/resources/pending', { token: admin });
+  const pendingVideo = pending.body?.find(r => r.id === video.body.id);
+  check('Moderator ödənişli video linkini görür', pendingVideo?.externalUrl === 'https://www.youtube.com/watch?v=kesrler-dersi',
+    `externalUrl=${pendingVideo?.externalUrl}`);
 
   await call('POST', `/admin/resources/${video.body.id}/approve`, { token: admin });
   const lockedVideo = await call('POST', `/resources/${video.body.id}/download`, { token: student });

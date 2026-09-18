@@ -4,6 +4,8 @@ using Microsoft.Extensions.Options;
 using MimeduAz.Application.Common.Exceptions;
 using MimeduAz.Application.Common.Interfaces;
 using MimeduAz.Application.Common.Options;
+using MimeduAz.Application.Services;
+using MimeduAz.Domain.Entities;
 using MimeduAz.Infrastructure.Persistence;
 
 namespace MimeduAz.Tests.TestSupport;
@@ -101,5 +103,22 @@ public sealed class FakeCertificateDocumentService : ICertificateDocumentService
             new byte[] { 1, 2, 3 },
             isPdf ? "application/pdf" : "image/png",
             $"mimedu-sertifikat-{certificate.Code}.{(isPdf ? "pdf" : "png")}");
+    }
+}
+
+/// <summary>
+/// Bildirişləri göndərmək əvəzinə yadda saxlayan saxta servis —
+/// testlər SMTP-yə toxunmasın deyə.
+/// </summary>
+public sealed class FakeNotificationService : INotificationService
+{
+    private readonly List<Guid> _notified = new();
+
+    public IReadOnlyList<Guid> NotifiedResourceIds => _notified;
+
+    public Task NotifyAdminsOfPendingResourceAsync(Resource resource, CancellationToken ct)
+    {
+        _notified.Add(resource.Id);
+        return Task.CompletedTask;
     }
 }

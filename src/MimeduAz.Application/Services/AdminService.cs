@@ -29,7 +29,14 @@ public sealed class AdminService : IAdminService
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<ResourceDto>> GetPendingResourcesAsync(CancellationToken ct)
+    /// <summary>
+    /// Moderator resursu təsdiqləməzdən əvvəl onun məzmununu görməlidir,
+    /// ona görə admin cavablarında ödənişli link də açıq gedir.
+    /// </summary>
+    private static readonly ResourceViewContext ModeratorView =
+        new(IsPurchased: false, IsAuthor: false, IsAdmin: true);
+
+    public async Task<IReadOnlyList<ResourceDetailDto>> GetPendingResourcesAsync(CancellationToken ct)
     {
         var resources = await _db.Resources
             .AsNoTracking()
@@ -39,7 +46,7 @@ public sealed class AdminService : IAdminService
             .OrderBy(r => r.CreatedAt)
             .ToListAsync(ct);
 
-        return resources.Select(r => r.ToDto()).ToList();
+        return resources.Select(r => r.ToDetailDto(ModeratorView)).ToList();
     }
 
     public async Task<ResourceDetailDto> ApproveResourceAsync(Guid resourceId, CancellationToken ct)
@@ -53,7 +60,7 @@ public sealed class AdminService : IAdminService
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Resurs təsdiqləndi. ResourceId: {ResourceId}", resourceId);
 
-        return resource.ToDetailDto();
+        return resource.ToDetailDto(ModeratorView);
     }
 
     public async Task<ResourceDetailDto> RejectResourceAsync(
@@ -68,7 +75,7 @@ public sealed class AdminService : IAdminService
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Resurs rədd edildi. ResourceId: {ResourceId}", resourceId);
 
-        return resource.ToDetailDto();
+        return resource.ToDetailDto(ModeratorView);
     }
 
     public async Task<IReadOnlyList<AdminUserDto>> GetUsersAsync(CancellationToken ct)
@@ -160,6 +167,218 @@ public sealed class AdminService : IAdminService
             .ToListAsync(ct);
 
         return orders.Select(o => o.ToDto()).ToList();
+    }
+
+    public async Task<AdminDashboardDto> GetDashboardAsync(CancellationToken ct)
+    {
+        var since24h = DateTime.UtcNow.AddHours(-24);
+
+        return new AdminDashboardDto(
+            await BuildTrafficStatsAsync(since24h, ct),
+            await BuildContentStatsAsync(ct),
+            await BuildTrainingStatsAsync(ct),
+            await BuildSalesStatsAsync(ct),
+            await BuildTopErrorsAsync(ct),
+            await BuildTopTrainingsAsync(ct),
+            DateTime.UtcNow);
+    }
+
+    private async Task<AdminTrafficStatsDto> BuildTrafficStatsAsync(DateTime since, CancellationToken ct)
+    {
+        // Tək qruplaşdırma ilə bütün saylar - hər göstərici üçün ayrıca COUNT getməsin.
+        var summary = await _db.RequestLogs
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.LongCount(),
+                Last24 = g.LongCount(l => l.CreatedAt >= since),
+                Failed = g.LongCount(l => l.StatusCode >= 400),
+                ClientErrors = g.LongCount(l => l.StatusCode >= 400 && l.StatusCode < 500),
+                ServerErrors = g.LongCount(l => l.StatusCode >= 500),
+                ServerErrors24 = g.LongCount(l => l.StatusCode >= 500 && l.CreatedAt >= since),
+                AverageDuration = g.Average(l => (double?)l.DurationMs)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (summary is null || summary.Total == 0)
+        {
+            return new AdminTrafficStatsDto(0, 0, 0, 0, 0, 0, 0, 0);
+        }
+
+        return new AdminTrafficStatsDto(
+            summary.Total,
+            summary.Last24,
+            summary.Failed,
+            summary.ClientErrors,
+            summary.ServerErrors,
+            summary.ServerErrors24,
+            Math.Round(summary.AverageDuration ?? 0, 1),
+            Math.Round(summary.Failed * 100d / summary.Total, 2));
+    }
+
+    private async Task<AdminContentStatsDto> BuildContentStatsAsync(CancellationToken ct)
+    {
+        var resources = await _db.Resources
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Pending = g.Count(r => r.Status == ResourceStatus.Pending),
+                Approved = g.Count(r => r.Status == ResourceStatus.Approved),
+                Rejected = g.Count(r => r.Status == ResourceStatus.Rejected),
+                Downloads = g.Sum(r => r.Downloads)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        return new AdminContentStatsDto(
+            await _db.Users.CountAsync(ct),
+            resources?.Total ?? 0,
+            resources?.Pending ?? 0,
+            resources?.Approved ?? 0,
+            resources?.Rejected ?? 0,
+            resources?.Downloads ?? 0,
+            await _db.BlogPosts.CountAsync(ct),
+            await _db.Certificates.CountAsync(ct));
+    }
+
+    private async Task<AdminTrainingStatsDto> BuildTrainingStatsAsync(CancellationToken ct)
+    {
+        var trainings = await _db.Trainings
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Live = g.Count(t => t.Format == TrainingFormat.Live),
+                Online = g.Count(t => t.Format == TrainingFormat.Online),
+                Video = g.Count(t => t.Format == TrainingFormat.Video)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var enrollments = await _db.Enrollments
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Completed = g.Count(e => e.Status == EnrollmentStatus.Completed)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        // "Satılan təlim" = ödənişi tamamlanmış sifarişlərdəki təlim sətirləri.
+        // Qeydiyyat sayı bundan fərqlənə bilər (admin əl ilə də yazdıra bilər).
+        var sold = await _db.OrderItems
+            .AsNoTracking()
+            .Where(oi => oi.ItemType == CatalogItemType.Training && oi.Order!.Status == OrderStatus.Paid)
+            .GroupBy(_ => 1)
+            .Select(g => new { Count = g.Count(), Revenue = g.Sum(oi => oi.Price) })
+            .FirstOrDefaultAsync(ct);
+
+        return new AdminTrainingStatsDto(
+            trainings?.Total ?? 0,
+            trainings?.Live ?? 0,
+            trainings?.Online ?? 0,
+            trainings?.Video ?? 0,
+            await _db.TrainingLessons.CountAsync(ct),
+            enrollments?.Total ?? 0,
+            enrollments?.Completed ?? 0,
+            sold?.Count ?? 0,
+            sold?.Revenue ?? 0m);
+    }
+
+    private async Task<AdminSalesStatsDto> BuildSalesStatsAsync(CancellationToken ct)
+    {
+        var paid = await _db.OrderItems
+            .AsNoTracking()
+            .Where(oi => oi.Order!.Status == OrderStatus.Paid)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Gmv = g.Sum(oi => oi.Price),
+                Commission = g.Sum(oi => oi.CommissionAmount),
+                Payout = g.Sum(oi => oi.AuthorPayoutAmount),
+                SoldResources = g.Count(oi => oi.ItemType == CatalogItemType.Resource),
+                ResourceRevenue = g.Sum(oi => oi.ItemType == CatalogItemType.Resource ? oi.Price : 0m)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        return new AdminSalesStatsDto(
+            paid?.Gmv ?? 0m,
+            paid?.Commission ?? 0m,
+            paid?.Payout ?? 0m,
+            await _db.Orders.CountAsync(o => o.Status == OrderStatus.Paid, ct),
+            await _db.Orders.CountAsync(o => o.Status == OrderStatus.Pending, ct),
+            paid?.SoldResources ?? 0,
+            paid?.ResourceRevenue ?? 0m);
+    }
+
+    /// <summary>Ən çox təkrarlanan uğursuz ünvanlar - problemi tez tapmaq üçün.</summary>
+    private async Task<IReadOnlyList<AdminTopErrorDto>> BuildTopErrorsAsync(CancellationToken ct)
+    {
+        // Qruplaşdırmanı birbaşa record-a proyeksiya etmək EF-də tərcümə olunmur,
+        // ona görə əvvəlcə anonim tipə yığılır, DTO isə yaddaşda qurulur.
+        var rows = await _db.RequestLogs
+            .AsNoTracking()
+            .Where(l => l.StatusCode >= 400)
+            .GroupBy(l => new { l.Method, l.Path, l.StatusCode })
+            .Select(g => new
+            {
+                g.Key.Method,
+                g.Key.Path,
+                g.Key.StatusCode,
+                Count = g.LongCount(),
+                LastOccurredAt = g.Max(l => l.CreatedAt)
+            })
+            .OrderByDescending(x => x.Count)
+            .Take(10)
+            .ToListAsync(ct);
+
+        return rows
+            .Select(x => new AdminTopErrorDto(x.Method, x.Path, x.StatusCode, x.Count, x.LastOccurredAt))
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<AdminTopTrainingDto>> BuildTopTrainingsAsync(CancellationToken ct)
+    {
+        var counts = await _db.Enrollments
+            .AsNoTracking()
+            .GroupBy(e => e.TrainingId)
+            .Select(g => new { TrainingId = g.Key, Count = g.Count() })
+            .OrderByDescending(x => x.Count)
+            .Take(10)
+            .ToListAsync(ct);
+
+        if (counts.Count == 0)
+        {
+            return Array.Empty<AdminTopTrainingDto>();
+        }
+
+        var trainingIds = counts.Select(x => x.TrainingId).ToList();
+
+        var names = await _db.Trainings
+            .AsNoTracking()
+            .Where(t => trainingIds.Contains(t.Id))
+            .ToDictionaryAsync(t => t.Id, t => t.Name, ct);
+
+        var revenue = await _db.OrderItems
+            .AsNoTracking()
+            .Where(oi =>
+                oi.ItemType == CatalogItemType.Training &&
+                trainingIds.Contains(oi.ItemId) &&
+                oi.Order!.Status == OrderStatus.Paid)
+            .GroupBy(oi => oi.ItemId)
+            .Select(g => new { TrainingId = g.Key, Total = g.Sum(oi => oi.Price) })
+            .ToDictionaryAsync(x => x.TrainingId, x => x.Total, ct);
+
+        return counts
+            .Select(x => new AdminTopTrainingDto(
+                x.TrainingId,
+                names.GetValueOrDefault(x.TrainingId, "Silinmiş təlim"),
+                x.Count,
+                revenue.GetValueOrDefault(x.TrainingId)))
+            .ToList();
     }
 
     public async Task<PagedResult<RequestLogDto>> GetRequestLogsAsync(RequestLogQuery query, CancellationToken ct)

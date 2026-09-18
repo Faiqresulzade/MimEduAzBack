@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.Configure<RequestLogOptions>(configuration.GetSection(RequestLogOptions.SectionName));
         services.Configure<CertificateOptions>(configuration.GetSection(CertificateOptions.SectionName));
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
 
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
 
@@ -28,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<ICertificateService, CertificateService>();
         services.AddScoped<IAdminService, AdminService>();
         services.AddScoped<IBlogService, BlogService>();
+        services.AddScoped<INotificationService, NotificationService>();
 
         return services;
     }

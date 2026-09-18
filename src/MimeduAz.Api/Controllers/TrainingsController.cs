@@ -47,6 +47,32 @@ public sealed class TrainingsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
+    /// <summary>Təlimin məlumatlarını yeniləyir. Yalnız Admin.</summary>
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = AppRoles.Admin)]
+    [ProducesResponseType(typeof(TrainingDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TrainingDetailDto>> Update(
+        Guid id, UpdateTrainingRequest request, CancellationToken ct) =>
+        Ok(await _trainings.UpdateAsync(id, request, ct));
+
+    /// <summary>
+    /// Təlimi silir. Yalnız Admin. Təlimə qeydiyyat varsa 409 qaytarılır -
+    /// istifadəçilərin aldığı məzmun silinməsin deyə.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = AppRoles.Admin)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await _trainings.DeleteAsync(id, ct);
+        return NoContent();
+    }
+
     /// <summary>Cari istifadəçinin yazıldığı təlimlər (irəliləyiş və sertifikat kodu ilə).</summary>
     [HttpGet("mine")]
     [Authorize]

@@ -119,3 +119,24 @@ public sealed record MyTrainingDto(
     DateTime EnrolledAt,
     DateTime? CompletedAt,
     string? CertificateCode);
+
+/// <summary>
+/// Təlimin redaktəsi. Dərslər ayrıca <c>PUT /trainings/{id}/lessons</c> ilə idarə olunur,
+/// buna görə burada dərs siyahısı yoxdur.
+/// </summary>
+public sealed class UpdateTrainingRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public TrainingFormat Format { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public int DurationHours { get; set; }
+    public string MetaLabel { get; set; } = string.Empty;
+    public int? SeatLimit { get; set; }
+
+    /// <summary>
+    /// Göndərilsə proqram maddələri tam əvəz olunur.
+    /// null buraxılsa mövcud siyahıya toxunulmur.
+    /// </summary>
+    public List<string>? Syllabus { get; set; }
+}

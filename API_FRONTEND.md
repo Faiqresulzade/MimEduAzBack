@@ -135,6 +135,9 @@ Publik. Default olaraq yalnız `Approved` statuslu resurslar qayıdır.
     status: "Approved",
     hasQuiz: boolean,
     isLinkBased: boolean,        // Video / ExternalLink — faylı yoxdur
+    isPurchased: boolean,        // cari istifadəçi bunu satın alıb
+    canAccess: boolean,          // pulsuzdur VƏ YA alınıb VƏ YA sizin materialınızdır —
+                                  // "Səbətə at" düyməsini bunun tərsinə görə göstərin
     createdAt, approvedAt: string | null
   }],
   page: number, pageSize: number, totalCount: number, totalPages: number
@@ -154,7 +157,10 @@ Publik (amma Pending/Rejected resurs yalnız müəllifi/admin görür — başqa
   hasQuiz: boolean, quizId: string | null,
   originalFileName: string | null,
   isLinkBased: boolean,
-  externalUrl: string | null,   // yalnız PULSUZ link resurslarında dolu
+  externalUrl: string | null,   // pulsuzda həmişə dolu; ödənişlidə YALNIZ satın alana,
+                                 // müəllifə və admin-ə göstərilir, digərinə null gəlir
+  isPurchased: boolean,
+  canAccess: boolean,
   createdAt, approvedAt
 }
 ```
@@ -252,6 +258,10 @@ Endirmə/açılış sayını artırır və linki qaytarır. Pulsuz resurs üçü
 ### `GET /resources/mine` 🔒
 Cari istifadəçinin bütün resursları (bütün statuslar daxil) — `ResourceDto[]`.
 
+### `GET /resources/purchased` 🔒
+Cari istifadəçinin ödənişini tamamladığı resurslar — `ResourceDto[]` (hamısında
+`isPurchased: true`, `canAccess: true`). "Aldıqlarım" səhifəsini bununla qurun.
+
 ### `GET /resources/author/{userId}`
 Publik müəllif profili — yalnız təsdiqlənmiş resurslarla.
 ```ts
@@ -318,6 +328,28 @@ düyməsini göstərmək üçün).
 }
 // 201 Created — TrainingDetailDto
 ```
+
+### `PUT /trainings/{id}` 🔒 (yalnız Admin)
+Təlimin əsas məlumatlarını yeniləyir. Dərslər bura daxil deyil — onlar üçün
+`POST /trainings/{trainingId}/lessons` istifadə edin.
+```ts
+{
+  name, format: "Live"|"Online"|"Video", description,
+  price: number, durationHours: number, metaLabel: string,
+  seatLimit: number | null,     // Live üçün məcburidir; mövcud qeydiyyat
+                                 // sayından aşağı ola bilməz (400)
+  syllabus: string[] | null     // göndərilsə tam əvəz olunur, null buraxılsa toxunulmur
+}
+// 200 OK — TrainingDetailDto
+```
+Xəta: `404` (mövcud deyil), `400` (validasiya və ya limit ixtisarı).
+
+### `DELETE /trainings/{id}` 🔒 (yalnız Admin)
+Təlimi silir. Cavab: `204 No Content`.
+
+Xəta: `409 Conflict` — **təlimə heç olmasa bir qeydiyyat varsa silinmir** (istifadəçinin
+aldığı məzmun və sertifikat tarixçəsi qorunur). Belə halda əvvəlcə `PUT` ilə
+redaktə edin. Silinən təlim kiminsə açıq səbətindəsə həmin sətir avtomatik silinir.
 
 ### `GET /trainings/mine` 🔒
 Cari istifadəçinin yazıldığı təlimlər (enrollment məlumatı ilə).
@@ -555,13 +587,54 @@ Bütün endpoint-lər 🔒 yalnız Admin rolu.
 
 | Endpoint | Cavab |
 |---|---|
-| `GET /admin/resources/pending` | `ResourceDto[]` — moderasiya növbəsi |
+| `GET /admin/dashboard` | `AdminDashboardDto` — panelin baş səhifəsi (aşağıda) |
+| `GET /admin/resources/pending` | `ResourceDetailDto[]` — moderasiya növbəsi (link/fayl adı daxil) |
 | `POST /admin/resources/{id}/approve` | `ResourceDetailDto` |
 | `POST /admin/resources/{id}/reject` `{ reason?: string }` | `ResourceDetailDto` (`rejectionReason` dolu) |
 | `GET /admin/users` | `AdminUserDto[]` (aşağıda) |
 | `GET /admin/sales` | `SalesSummaryDto` (aşağıda) |
 | `GET /admin/orders` | `OrderDto[]` — bütün sifarişlər |
 | `GET /admin/logs` | `PagedResult<RequestLogDto>` — HTTP audit log (aşağıda) |
+
+> ⚠️ `GET /admin/resources/pending` `ResourceDetailDto` qaytarır (əvvəllər
+> `ResourceDto` idi) — moderator təsdiqdən əvvəl ödənişli video/xarici linki
+> və fayl adını görməlidir. Digər `ResourceDto` istifadə edən yerlərə təsir etmir.
+
+### `GET /admin/dashboard`
+Panelin baş səhifəsi üçün bütün icmal göstəriciləri **tək sorğuda**.
+```ts
+// AdminDashboardDto
+{
+  traffic: {
+    totalRequests: number, requestsLast24Hours: number,
+    failedRequests: number,        // statusCode >= 400
+    clientErrors: number,          // 4xx
+    serverErrors: number,          // 5xx
+    serverErrorsLast24Hours: number,
+    averageDurationMs: number,
+    errorRatePercent: number       // failedRequests / totalRequests * 100
+  },
+  content: {
+    totalUsers, totalResources, pendingResources, approvedResources,
+    rejectedResources, totalDownloads, blogPosts, issuedCertificates
+  },
+  trainings: {
+    totalTrainings, liveTrainings, onlineTrainings, videoTrainings,
+    totalLessons, totalEnrollments, completedEnrollments,
+    soldTrainings: number,         // ödənişi tamamlanmış sifarişlərdəki təlim sayı
+    trainingRevenue: number
+  },
+  sales: {
+    gmv, commissionTotal, authorPayoutTotal,
+    paidOrders: number, pendingOrders: number,
+    soldResources: number, resourceRevenue: number
+  },
+  topErrors: [{ method, path, statusCode, count: number, lastOccurredAt: string }],
+  topTrainings: [{ trainingId, name, enrollmentCount: number, revenue: number }],
+  generatedAt: string
+}
+```
+`topErrors`/`topTrainings` ən çox 10 sətirlik siyahılardır (say üzrə azalan).
 
 **Audit log** (`GET /admin/logs`) — bütün API sorğularının tarixçəsi.
 Query: `method`, `path`, `statusCode`, `userId`, `onlyErrors`, `from`, `to`, `page`, `pageSize` (default 50, max 200).

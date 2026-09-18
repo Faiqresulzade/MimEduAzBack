@@ -30,5 +30,11 @@ public interface IResourceService
     Task<ResourceDetailDto> CreateLinkAsync(CreateResourceLinkRequest request, CancellationToken ct);
     Task<ResourceDownloadDto> DownloadAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<ResourceDto>> GetMineAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Cari istifadəçinin ödənişini tamamladığı resurslar.
+    /// Frontend "Aldıqlarım" bölməsini bununla doldurur.
+    /// </summary>
+    Task<IReadOnlyList<ResourceDto>> GetPurchasedAsync(CancellationToken ct);
     Task<AuthorProfileDto> GetAuthorProfileAsync(Guid authorId, CancellationToken ct);
 }

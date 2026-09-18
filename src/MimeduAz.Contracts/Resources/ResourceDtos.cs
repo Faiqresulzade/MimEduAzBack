@@ -18,6 +18,13 @@ public sealed record ResourceDto(
     bool HasQuiz,
     /// <summary>Fayl yox, xarici link əsaslıdır (Video / ExternalLink).</summary>
     bool IsLinkBased,
+    /// <summary>Cari istifadəçi bu ödənişli resursu satın alıbmı.</summary>
+    bool IsPurchased,
+    /// <summary>
+    /// Cari istifadəçi resursu indi aça/endirə bilirmi — pulsuzdursa, satın alıbsa,
+    /// müəllifidirsə və ya admindirsə true. Frontend "Səbətə at" düyməsini buna görə gizlədir.
+    /// </summary>
+    bool CanAccess,
     DateTime CreatedAt,
     DateTime? ApprovedAt);
 
@@ -41,10 +48,12 @@ public sealed record ResourceDetailDto(
     string? OriginalFileName,
     bool IsLinkBased,
     /// <summary>
-    /// Yalnız PULSUZ link resurslarında doldurulur (məs. video embed üçün).
-    /// Ödənişli videoda null qalır - link "download" endpoint-i ilə alınır.
+    /// Link resursunun ünvanı. Pulsuz resurslarda həmişə, ödənişli resurslarda isə
+    /// yalnız satın alana, müəllifə və adminə göndərilir (moderasiya üçün lazımdır).
     /// </summary>
     string? ExternalUrl,
+    bool IsPurchased,
+    bool CanAccess,
     DateTime CreatedAt,
     DateTime? ApprovedAt);
 

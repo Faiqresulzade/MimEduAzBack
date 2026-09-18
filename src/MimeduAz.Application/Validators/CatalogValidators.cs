@@ -216,3 +216,24 @@ public sealed class CreateResourceLinkRequestValidator : AbstractValidator<Creat
             .LessThanOrEqualTo(1000).WithMessage("Qiymət 1000 AZN-dən çox ola bilməz.");
     }
 }
+
+public sealed class UpdateTrainingRequestValidator : AbstractValidator<UpdateTrainingRequest>
+{
+    public UpdateTrainingRequestValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().WithMessage("Təlimin adı boş ola bilməz.").MaximumLength(200);
+        RuleFor(x => x.Format).IsInEnum().WithMessage("Təlim formatı düzgün deyil.");
+        RuleFor(x => x.Description).NotEmpty().WithMessage("Təsvir boş ola bilməz.").MaximumLength(2000);
+        RuleFor(x => x.Price).GreaterThanOrEqualTo(0).WithMessage("Qiymət mənfi ola bilməz.");
+        RuleFor(x => x.DurationHours).GreaterThan(0).WithMessage("Müddət 0-dan böyük olmalıdır.");
+        RuleFor(x => x.MetaLabel).NotEmpty().WithMessage("Meta etiket boş ola bilməz.").MaximumLength(100);
+
+        RuleFor(x => x.SeatLimit)
+            .GreaterThan(0).When(x => x.SeatLimit.HasValue)
+            .WithMessage("Yer limiti 0-dan böyük olmalıdır.");
+
+        RuleFor(x => x.SeatLimit)
+            .NotNull().When(x => x.Format == TrainingFormat.Live)
+            .WithMessage("Canlı təlim üçün yer limiti göstərilməlidir.");
+    }
+}

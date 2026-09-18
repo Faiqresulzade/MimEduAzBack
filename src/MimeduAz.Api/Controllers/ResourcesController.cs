@@ -133,6 +133,17 @@ public sealed class ResourcesController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<ResourceDto>>> Mine(CancellationToken ct) =>
         Ok(await _resources.GetMineAsync(ct));
 
+    /// <summary>
+    /// Cari istifadəçinin satın aldığı ödənişli resurslar.
+    /// Siyahıdakı hər sətir <c>canAccess = true</c> gəlir - frontend burada
+    /// "Səbətə at" əvəzinə "Aç / Endir" göstərməlidir.
+    /// </summary>
+    [HttpGet("purchased")]
+    [Authorize]
+    [ProducesResponseType(typeof(IReadOnlyList<ResourceDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ResourceDto>>> Purchased(CancellationToken ct) =>
+        Ok(await _resources.GetPurchasedAsync(ct));
+
     /// <summary>Müəllifin ictimai profili və təsdiqlənmiş resursları.</summary>
     [HttpGet("author/{userId:guid}")]
     [AllowAnonymous]

@@ -9,6 +9,7 @@ using MimeduAz.Application.Common.Options;
 using MimeduAz.Domain.Entities;
 using MimeduAz.Infrastructure.Certificates;
 using MimeduAz.Infrastructure.Identity;
+using MimeduAz.Infrastructure.Email;
 using MimeduAz.Infrastructure.Logging;
 using MimeduAz.Infrastructure.Persistence;
 using MimeduAz.Infrastructure.Storage;
@@ -69,6 +70,12 @@ public static class DependencyInjection
         services.AddSingleton<RequestLogQueue>();
         services.AddSingleton<IRequestLogSink>(sp => sp.GetRequiredService<RequestLogQueue>());
         services.AddHostedService<RequestLogWriter>();
+
+        // E-poçt eyni nümunə ilə: sorğu növbəyə yazır, SMTP arxa planda işləyir.
+        services.AddSingleton<EmailQueue>();
+        services.AddSingleton<IEmailQueue>(sp => sp.GetRequiredService<EmailQueue>());
+        services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        services.AddHostedService<EmailBackgroundSender>();
 
         return services;
     }

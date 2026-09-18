@@ -175,6 +175,7 @@ public sealed class ResourceServiceTests
         new FakeFileStorageService(),
         new FakeCurrentUserService(userId, isAdmin),
         TestHarness.FileStorage(),
+        new FakeNotificationService(),
         TestHarness.Logger<ResourceService>());
 
     private static CreateResourceRequest Request() => new()

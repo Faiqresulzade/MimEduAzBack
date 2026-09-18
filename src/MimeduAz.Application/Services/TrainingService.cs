@@ -121,6 +121,105 @@ public sealed class TrainingService : ITrainingService
         return training.ToDetailDto(seatsTaken: 0, training.Lessons.Count, isEnrolled: false);
     }
 
+    public async Task<TrainingDetailDto> UpdateAsync(
+        Guid id,
+        UpdateTrainingRequest request,
+        CancellationToken ct)
+    {
+        var training = await _db.Trainings
+            .Include(t => t.SyllabusItems)
+            .FirstOrDefaultAsync(t => t.Id == id, ct)
+            ?? throw NotFoundException.For("Təlim", id);
+
+        var seatsTaken = await _db.Enrollments.CountAsync(e => e.TrainingId == id, ct);
+
+        // Limiti artıq yazılmış adamdan aşağı salmaq mövcud qeydiyyatları etibarsız edərdi.
+        if (request.SeatLimit is { } limit && limit < seatsTaken)
+        {
+            throw new ConflictException(
+                $"Yer limiti mövcud qeydiyyat sayından ({seatsTaken}) az ola bilməz.");
+        }
+
+        training.Name = request.Name.Trim();
+        training.Format = request.Format;
+        training.Description = request.Description.Trim();
+        training.Price = request.Price;
+        training.DurationHours = request.DurationHours;
+        training.MetaLabel = request.MetaLabel.Trim();
+        training.SeatLimit = request.Format == TrainingFormat.Live ? request.SeatLimit : null;
+
+        if (request.Syllabus is not null)
+        {
+            ReplaceSyllabus(training, request.Syllabus);
+        }
+
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Təlim yeniləndi. TrainingId: {TrainingId}", id);
+
+        var lessonCount = await _db.TrainingLessons.CountAsync(l => l.TrainingId == id, ct);
+        return training.ToDetailDto(seatsTaken, lessonCount, isEnrolled: false);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct)
+    {
+        var training = await _db.Trainings
+            .Include(t => t.SyllabusItems)
+            .Include(t => t.Lessons)
+            .FirstOrDefaultAsync(t => t.Id == id, ct)
+            ?? throw NotFoundException.For("Təlim", id);
+
+        var enrollmentCount = await _db.Enrollments.CountAsync(e => e.TrainingId == id, ct);
+
+        // Kaskad silmə qeydiyyatları da aparardı, ona görə burada dayanırıq:
+        // satılmış təlimi silmək əvəzinə admin onu redaktə etməlidir.
+        if (enrollmentCount > 0)
+        {
+            throw new ConflictException(
+                $"Bu təlimə {enrollmentCount} qeydiyyat var, silinə bilməz. Əvəzinə məlumatlarını redaktə edin.");
+        }
+
+        // Silinən təlim kiminsə səbətində qalarsa ödəniş mərhələsində 404 verərdi.
+        var staleCartItems = await _db.CartItems
+            .Where(i => i.ItemType == CatalogItemType.Training && i.ItemId == id)
+            .ToListAsync(ct);
+
+        if (staleCartItems.Count > 0)
+        {
+            _db.CartItems.RemoveRange(staleCartItems);
+        }
+
+        _db.Trainings.Remove(training);
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Təlim silindi. TrainingId: {TrainingId}, Səbətdən silinən sətir: {CartItems}",
+            id, staleCartItems.Count);
+    }
+
+    private void ReplaceSyllabus(Training training, IReadOnlyList<string> texts)
+    {
+        var items = training.SyllabusItems.ToList();
+        _db.TrainingSyllabusItems.RemoveRange(items);
+
+        foreach (var item in items)
+        {
+            training.SyllabusItems.Remove(item);
+        }
+
+        var order = 0;
+        foreach (var text in texts.Where(t => !string.IsNullOrWhiteSpace(t)))
+        {
+            // Id əvvəlcədən dolu olduğu üçün açıq şəkildə DbSet-ə əlavə edilir;
+            // yalnız kolleksiyaya atsaq EF onu "Modified" kimi izləyər.
+            _db.TrainingSyllabusItems.Add(new TrainingSyllabusItem
+            {
+                TrainingId = training.Id,
+                OrderIndex = order++,
+                Text = text.Trim()
+            });
+        }
+    }
+
     public async Task<IReadOnlyList<MyTrainingDto>> GetMineAsync(CancellationToken ct)
     {
         var userId = _currentUser.RequireUserId();

@@ -18,6 +18,7 @@ public sealed class ResourceService : IResourceService
     private readonly IFileStorageService _files;
     private readonly ICurrentUserService _currentUser;
     private readonly FileStorageOptions _storage;
+    private readonly INotificationService _notifications;
     private readonly ILogger<ResourceService> _logger;
 
     public ResourceService(
@@ -25,12 +26,14 @@ public sealed class ResourceService : IResourceService
         IFileStorageService files,
         ICurrentUserService currentUser,
         IOptions<FileStorageOptions> storage,
+        INotificationService notifications,
         ILogger<ResourceService> logger)
     {
         _db = db;
         _files = files;
         _currentUser = currentUser;
         _storage = storage.Value;
+        _notifications = notifications;
         _logger = logger;
     }
 
@@ -85,7 +88,7 @@ public sealed class ResourceService : IResourceService
 
         return new PagedResult<ResourceDto>
         {
-            Items = items.Select(r => r.ToDto()).ToList(),
+            Items = await MapManyAsync(items, ct),
             Page = page,
             PageSize = pageSize,
             TotalCount = total
@@ -109,7 +112,7 @@ public sealed class ResourceService : IResourceService
             throw NotFoundException.For("Resurs", id);
         }
 
-        return resource.ToDetailDto();
+        return resource.ToDetailDto(await BuildViewAsync(resource, ct));
     }
 
     public async Task<ResourceDetailDto> CreateAsync(
@@ -146,7 +149,9 @@ public sealed class ResourceService : IResourceService
             "Yeni resurs yükləndi və moderasiyaya göndərildi. ResourceId: {ResourceId}", resource.Id);
 
         resource.Author = await _db.Users.FirstOrDefaultAsync(u => u.Id == authorId, ct);
-        return resource.ToDetailDto();
+        await _notifications.NotifyAdminsOfPendingResourceAsync(resource, ct);
+
+        return resource.ToDetailDto(AuthorView);
     }
 
     public async Task<ResourceDetailDto> CreateLinkAsync(CreateResourceLinkRequest request, CancellationToken ct)
@@ -189,7 +194,9 @@ public sealed class ResourceService : IResourceService
             resource.Id, resource.Type);
 
         resource.Author = await _db.Users.FirstOrDefaultAsync(u => u.Id == authorId, ct);
-        return resource.ToDetailDto();
+        await _notifications.NotifyAdminsOfPendingResourceAsync(resource, ct);
+
+        return resource.ToDetailDto(AuthorView);
     }
 
     public async Task<ResourceDownloadDto> DownloadAsync(Guid id, CancellationToken ct)
@@ -270,7 +277,38 @@ public sealed class ResourceService : IResourceService
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(ct);
 
-        return resources.Select(r => r.ToDto()).ToList();
+        return await MapManyAsync(resources, ct);
+    }
+
+    public async Task<IReadOnlyList<ResourceDto>> GetPurchasedAsync(CancellationToken ct)
+    {
+        var userId = _currentUser.RequireUserId();
+
+        var purchasedIds = await _db.OrderItems
+            .AsNoTracking()
+            .Where(oi =>
+                oi.ItemType == CatalogItemType.Resource &&
+                oi.Order!.UserId == userId &&
+                oi.Order.Status == OrderStatus.Paid)
+            .Select(oi => oi.ItemId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        if (purchasedIds.Count == 0)
+        {
+            return Array.Empty<ResourceDto>();
+        }
+
+        var resources = await _db.Resources
+            .AsNoTracking()
+            .Include(r => r.Author)
+            .Include(r => r.Quiz)
+            .Where(r => purchasedIds.Contains(r.Id))
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync(ct);
+
+        var purchased = purchasedIds.ToHashSet();
+        return resources.Select(r => r.ToDto(BuildView(r, purchased))).ToList();
     }
 
     public async Task<AuthorProfileDto> GetAuthorProfileAsync(Guid authorId, CancellationToken ct)
@@ -295,7 +333,67 @@ public sealed class ResourceService : IResourceService
             author.Subject,
             resources.Count,
             resources.Sum(r => r.Downloads),
-            resources.Select(r => r.ToDto()).ToList());
+            await MapManyAsync(resources, ct));
+    }
+
+    /// <summary>Yeni yaradılan resurs həmişə müəllifin öz gözü ilə qaytarılır.</summary>
+    private ResourceViewContext AuthorView => new(IsPurchased: false, IsAuthor: true, _currentUser.IsAdmin);
+
+    /// <summary>
+    /// Verilmiş resurslardan cari istifadəçinin ödənişini tamamladıqlarını qaytarır.
+    /// Anonim istifadəçi üçün sorğu ümumiyyətlə göndərilmir.
+    /// </summary>
+    private async Task<HashSet<Guid>> GetPurchasedIdsAsync(
+        IReadOnlyCollection<Guid> resourceIds,
+        CancellationToken ct)
+    {
+        var userId = _currentUser.UserId;
+
+        if (userId is null || resourceIds.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var ids = await _db.OrderItems
+            .AsNoTracking()
+            .Where(oi =>
+                oi.ItemType == CatalogItemType.Resource &&
+                resourceIds.Contains(oi.ItemId) &&
+                oi.Order!.UserId == userId &&
+                oi.Order.Status == OrderStatus.Paid)
+            .Select(oi => oi.ItemId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return ids.ToHashSet();
+    }
+
+    private ResourceViewContext BuildView(Resource resource, IReadOnlySet<Guid> purchasedIds) =>
+        new(purchasedIds.Contains(resource.Id),
+            _currentUser.UserId is not null && resource.AuthorId == _currentUser.UserId,
+            _currentUser.IsAdmin);
+
+    private async Task<ResourceViewContext> BuildViewAsync(Resource resource, CancellationToken ct)
+    {
+        // Ödənişli resurslarda sorğu lazımdır; pulsuzda cavab onsuz da dəyişmir.
+        if (!resource.IsPaid)
+        {
+            return BuildView(resource, new HashSet<Guid>());
+        }
+
+        var purchased = await GetPurchasedIdsAsync(new[] { resource.Id }, ct);
+        return BuildView(resource, purchased);
+    }
+
+    private async Task<List<ResourceDto>> MapManyAsync(
+        IReadOnlyList<Resource> resources,
+        CancellationToken ct)
+    {
+        // Səhifədəki bütün ödənişli resurslar üçün tək sorğu - N+1 olmasın deyə.
+        var paidIds = resources.Where(r => r.IsPaid).Select(r => r.Id).ToList();
+        var purchased = await GetPurchasedIdsAsync(paidIds, ct);
+
+        return resources.Select(r => r.ToDto(BuildView(r, purchased))).ToList();
     }
 
     private void ValidateFile(ResourceFileUpload file)
