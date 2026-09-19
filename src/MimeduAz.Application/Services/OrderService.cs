@@ -51,6 +51,7 @@ public sealed class OrderService : IOrderService
 
         var resourceIds = items.Where(i => i.ItemType == CatalogItemType.Resource).Select(i => i.ItemId).ToList();
         var trainingIds = items.Where(i => i.ItemType == CatalogItemType.Training).Select(i => i.ItemId).ToList();
+        var examIds = items.Where(i => i.ItemType == CatalogItemType.Exam).Select(i => i.ItemId).ToList();
 
         var resources = await _db.Resources
             .Where(r => resourceIds.Contains(r.Id))
@@ -59,6 +60,10 @@ public sealed class OrderService : IOrderService
         var trainings = await _db.Trainings
             .Where(t => trainingIds.Contains(t.Id))
             .ToDictionaryAsync(t => t.Id, ct);
+
+        var exams = await _db.Exams
+            .Where(e => examIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, ct);
 
         var order = new Order
         {
@@ -97,6 +102,28 @@ public sealed class OrderService : IOrderService
                     Price = item.Price,
                     CommissionAmount = commission,
                     AuthorPayoutAmount = item.Price - commission
+                });
+            }
+            else if (item.ItemType == CatalogItemType.Exam)
+            {
+                if (!exams.TryGetValue(item.ItemId, out var exam))
+                {
+                    throw new BadRequestException("Səbətdəki sınaqlardan biri artıq mövcud deyil.");
+                }
+
+                // Sınağı da müəllim yaradıb satır - resurslardakı kimi komissiya tutulur.
+                var examCommission = Math.Round(
+                    item.Price * _commission.ExamPercent, 2, MidpointRounding.AwayFromZero);
+
+                order.Items.Add(new OrderItem
+                {
+                    OrderId = order.Id,
+                    ItemType = CatalogItemType.Exam,
+                    ItemId = exam.Id,
+                    Name = exam.Name,
+                    Price = item.Price,
+                    CommissionAmount = examCommission,
+                    AuthorPayoutAmount = item.Price - examCommission
                 });
             }
             else

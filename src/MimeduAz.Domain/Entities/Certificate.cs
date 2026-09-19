@@ -19,6 +19,10 @@ public class Certificate
     public Guid? ResourceQuizAttemptId { get; set; }
     public QuizAttempt? ResourceQuizAttempt { get; set; }
 
+    /// <summary>Sınaq sertifikatıdırsa doldurulur.</summary>
+    public Guid? ExamAttemptId { get; set; }
+    public ExamAttempt? ExamAttempt { get; set; }
+
     /// <summary>İnsan-oxunaqlı təsvir, məs. "Nigar Əliyeva · «Süni intellektlə dərs dizaynı» · 12 saat · 14.03.2026".</summary>
     public string Description { get; set; } = string.Empty;
 

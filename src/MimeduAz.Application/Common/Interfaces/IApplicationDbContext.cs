@@ -29,6 +29,11 @@ public interface IApplicationDbContext
     DbSet<Quiz> Quizzes { get; }
     DbSet<QuizQuestion> QuizQuestions { get; }
     DbSet<QuizAttempt> QuizAttempts { get; }
+    DbSet<Exam> Exams { get; }
+    DbSet<ExamSection> ExamSections { get; }
+    DbSet<ExamQuestion> ExamQuestions { get; }
+    DbSet<ExamAttempt> ExamAttempts { get; }
+    DbSet<ExamAnswer> ExamAnswers { get; }
     DbSet<Certificate> Certificates { get; }
     DbSet<BlogPost> BlogPosts { get; }
     DbSet<RequestLog> RequestLogs { get; }

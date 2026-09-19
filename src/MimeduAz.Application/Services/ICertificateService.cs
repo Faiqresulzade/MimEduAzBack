@@ -20,6 +20,12 @@ public interface ICertificateService
     Task<CertificateDto> IssueForQuizAttemptAsync(Guid attemptId, CancellationToken ct);
 
     /// <summary>
+    /// Keçid balından yuxarı sınaq nəticəsi üçün sertifikat verir. Eyni cəhd üçün
+    /// təkrar çağırılarsa mövcud sertifikatı qaytarır (idempotent).
+    /// </summary>
+    Task<CertificateDto> IssueForExamAttemptAsync(Guid attemptId, CancellationToken ct);
+
+    /// <summary>
     /// Təlimin bütün dərsləri tamamlananda sertifikat verir. Eyni istifadəçi+təlim
     /// üçün təkrar çağırılarsa mövcud sertifikatı qaytarır (idempotent).
     /// </summary>

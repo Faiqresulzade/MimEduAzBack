@@ -453,7 +453,7 @@ Bütün endpoint-lər 🔒 (Authorize).
 // CartDto
 {
   id,
-  items: [{ id, itemType: "Resource"|"Training", itemId, name, price, addedAt }],
+  items: [{ id, itemType: "Resource"|"Training"|"Exam", itemId, name, price, addedAt }],
   total: number
 }
 ```
@@ -461,7 +461,7 @@ Bütün endpoint-lər 🔒 (Authorize).
 ### `POST /cart/items`
 ```ts
 // Request
-{ itemType: "Resource" | "Training", itemId: string }
+{ itemType: "Resource" | "Training" | "Exam", itemId: string }
 // 200 OK — CartDto (yenilənmiş)
 ```
 Qaydalar (xəta halları):
@@ -591,6 +591,9 @@ Bütün endpoint-lər 🔒 yalnız Admin rolu.
 | `GET /admin/resources/pending` | `ResourceDetailDto[]` — moderasiya növbəsi (link/fayl adı daxil) |
 | `POST /admin/resources/{id}/approve` | `ResourceDetailDto` |
 | `POST /admin/resources/{id}/reject` `{ reason?: string }` | `ResourceDetailDto` (`rejectionReason` dolu) |
+| `GET /admin/exams/pending` | `ExamDetailDto[]` — sınaq moderasiya növbəsi |
+| `POST /admin/exams/{id}/approve` | `ExamDetailDto` |
+| `POST /admin/exams/{id}/reject` `{ reason?: string }` | `ExamDetailDto` |
 | `GET /admin/users` | `AdminUserDto[]` (aşağıda) |
 | `GET /admin/sales` | `SalesSummaryDto` (aşağıda) |
 | `GET /admin/orders` | `OrderDto[]` — bütün sifarişlər |
@@ -628,6 +631,13 @@ Panelin baş səhifəsi üçün bütün icmal göstəriciləri **tək sorğuda**
     gmv, commissionTotal, authorPayoutTotal,
     paidOrders: number, pendingOrders: number,
     soldResources: number, resourceRevenue: number
+  },
+  exams: {
+    totalExams, pendingExams, approvedExams, rejectedExams,
+    totalQuestions,
+    totalAttempts, attemptsInProgress, passedAttempts,
+    averageScorePercent: number,
+    soldExams: number, examRevenue: number
   },
   topErrors: [{ method, path, statusCode, count: number, lastOccurredAt: string }],
   topTrainings: [{ trainingId, name, enrollmentCount: number, revenue: number }],
@@ -676,6 +686,205 @@ Query: `method`, `path`, `statusCode`, `userId`, `onlyErrors`, `from`, `to`, `pa
   trainingRevenue: number,
   commissionPercent: number    // 0.20 = 20%
 }
+```
+
+---
+
+## 7a. Sınaqlar (imtahan)
+
+Müəllimlər sınaq yaradıb satır. Sınağın **vaxt limiti** var, **fənn bölmələrinə** ayrılır,
+keçid balından yuxarı nəticəyə **sertifikat** verilir. Resurslar kimi moderasiyadan keçir.
+
+### `GET /exams`
+Publik. Default olaraq yalnız `Approved`.
+
+Query: `subject`, `grade`, `isPaid`, `search`, `page`, `pageSize`
+(+ `status` — **yalnız Admin token-lə** işləyir).
+
+```ts
+// 200 OK — PagedResult<ExamDto>
+{
+  items: [{
+    id, name, subject,
+    grade: number | null,
+    authorId, authorName,
+    durationMinutes: number,      // vaxt limiti
+    passPercent: number,          // sertifikat üçün minimum faiz
+    isPaid, price,
+    status: "Approved",
+    sectionCount: number,
+    questionCount: number,
+    attemptCount: number,         // neçə nəfər verib
+    isPurchased: boolean,
+    canAccess: boolean,           // false → "Səbətə at", true → "Sınağa başla"
+    createdAt, approvedAt
+  }],
+  page, pageSize, totalCount, totalPages
+}
+```
+
+### `GET /exams/{id}`
+Bölmələr və hər bölmədəki sual sayı. **Sualların özü burada YOXDUR** — onlar yalnız
+`start` ilə açılır.
+
+```ts
+// ExamDetailDto
+{
+  id, name, description, subject, grade,
+  authorId, authorName,
+  durationMinutes, passPercent, isPaid, price,
+  status, rejectionReason: string | null,
+  sections: [{ id, orderIndex, subject, questionCount }],
+  questionCount, attemptCount,
+  isPurchased, canAccess,
+  myAttempt: ExamAttemptSummaryDto | null,   // doludursa "Davam et"/"Nəticəyə bax"
+  createdAt, approvedAt
+}
+```
+
+### `POST /exams` 🔒 (Teacher / Admin)
+Sınağı bölmə və suallarla birlikdə yaradır → `Pending` (moderasiyaya düşür,
+adminlərə e-poçt gedir).
+
+```ts
+{
+  name, description, subject,
+  grade: number | null,
+  durationMinutes: number,        // 1-600
+  passPercent: number,            // 1-100
+  isPaid: boolean, price: number,
+  sections: [{
+    subject: string,              // məs. "Riyaziyyat"
+    questions: [{
+      questionText: string,       // LaTeX ola bilər: "$x^2 = 49$ ..."
+      imagePath?: string | null,  // POST /exams/{id}/images cavabındakı dəyər
+      options: string[],          // ən azı 2; variantlar da LaTeX ola bilər
+      correctOptionIndex: number
+    }]
+  }]
+}
+// 201 Created — ExamDetailDto
+```
+
+> **Sual ya mətn, ya şəkil ehtiva etməlidir** — ikisi də boşdursa `400`.
+
+### `PUT /exams/{id}` 🔒 (müəllif / Admin)
+Meta məlumatları yeniləyir (**suallara toxunmur**). Rədd edilmiş sınaq redaktədən
+sonra yenidən `Pending` olur.
+
+```ts
+{ name, description, subject, grade, durationMinutes, passPercent, isPaid, price }
+// 200 OK — ExamDetailDto
+```
+
+### `PUT /exams/{id}/sections` 🔒 (müəllif / Admin)
+Bütün bölmə və sualları **əvəz edir**.
+
+```ts
+{ sections: [ /* POST /exams ilə eyni struktur */ ] }
+// 200 OK — ExamDetailDto
+```
+Xəta: `409` — kimsə sınağı artıq veribsə (keçmiş nəticələr etibarsız olardı).
+Təsdiqlənmiş sınağın məzmunu dəyişsə status yenidən `Pending` olur.
+
+### `DELETE /exams/{id}` 🔒 (müəllif / Admin)
+`204 No Content`. Xəta: `409` — cəhd varsa silinmir.
+
+### `POST /exams/{id}/images` 🔒 (müəllif / Admin)
+Düstur/qrafik olan suallar üçün şəkil yükləyir. `multipart/form-data`, sahə adı: `file`.
+Max **5 MB**, `.jpg/.jpeg/.png/.webp`.
+
+```ts
+// 200 OK
+{ imagePath: string, imageUrl: string }
+```
+`imagePath` sual yaradılarkən `imagePath` sahəsinə yazılır; `imageUrl` isə göstərmək
+üçündür (`${API_ORIGIN}${imageUrl}`).
+
+### `GET /exams/mine` 🔒
+Müəllimin öz sınaqları (bütün statuslar daxil) — `ExamDto[]`.
+
+### `GET /exams/purchased` 🔒
+Satın alınmış sınaqlar — `ExamDto[]`.
+
+---
+
+### `POST /exams/{id}/start` 🔒
+Sınağı başladır və **sualları** qaytarır. Sayğac server tərəfdə qeyd olunur.
+
+```ts
+// 200 OK — ExamRunDto
+{
+  attemptId, examId, examName,
+  durationMinutes,
+  startedAt: string,
+  expiresAt: string,            // cavabların qəbul olunduğu son an
+  remainingSeconds: number,     // SAYĞACI BUNDAN QURUN (lokal saatdan yox)
+  sections: [{
+    id, orderIndex, subject,
+    questions: [{
+      id, orderIndex,
+      questionText: string,     // LaTeX ola bilər
+      imageUrl: string | null,
+      options: string[]
+      // correctOptionIndex BURADA YOXDUR
+    }]
+  }],
+  questionCount
+}
+```
+
+- Səhifə yenilənsə təkrar çağırmaq **təhlükəsizdir** — eyni cəhd qayıdır, vaxt sıfırlanmır.
+- Xətalar: `403` (ödənişlidir, alınmayıb), `400` (təsdiqlənməyib / öz sınağınızdır),
+  `409` (artıq vermisiniz və ya vaxtı bitib).
+
+### `POST /exams/attempts/{attemptId}/submit` 🔒
+```ts
+{ answers: [{ questionId: string, selectedIndex: number | null }] }
+// 200 OK — ExamResultDto
+```
+Cavabsız sual üçün `selectedIndex: null` göndərin (və ya sualı ümumiyyətlə göndərməyin) —
+səhv sayılır. Keçid balından yuxarı nəticədə **sertifikat avtomatik verilir**.
+
+Xəta: `409` — vaxt bitibsə (cəhd `Expired` olur, bal 0) və ya cəhd artıq bağlanıbsa.
+Şəbəkə gecikməsi üçün **30 saniyə güzəşt** var.
+
+### `GET /exams/attempts/{attemptId}` 🔒
+Tamamlanmış cəhdin nəticəsi — fənn üzrə bal və **cavab açarı**.
+
+```ts
+// ExamResultDto
+{
+  attemptId, examId, examName,
+  status: "Submitted" | "Expired",
+  scorePercent, correctCount, questionCount,
+  passPercent, passed: boolean,
+  startedAt, submittedAt,
+  elapsedSeconds: number,
+  sections: [{
+    sectionId, subject,
+    correctCount, questionCount, scorePercent,   // FƏNN ÜZRƏ BAL
+    questions: [{
+      questionId, orderIndex, questionText, imageUrl, options,
+      correctOptionIndex: number,    // nəticə ekranında AÇIQ gəlir
+      selectedIndex: number | null,
+      isCorrect: boolean
+    }]
+  }],
+  certificateCode: string | null
+}
+```
+Cəhdin sahibi, sınağın müəllifi və admin görə bilər; başqasına `403`.
+
+### `GET /exams/attempts/mine` 🔒
+```ts
+// ExamAttemptSummaryDto[]
+[{
+  id, examId, examName,
+  status, scorePercent, correctCount, questionCount, passed,
+  startedAt, expiresAt, submittedAt,
+  certificateCode: string | null
+}]
 ```
 
 ---
@@ -765,7 +974,9 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 | `ResourceStatus` | `Pending`, `Approved`, `Rejected` |
 | `TrainingFormat` | `Live`, `Online`, `Video` |
 | `EnrollmentStatus` | `InProgress`, `Completed` |
-| `CatalogItemType` | `Resource`, `Training` |
+| `ExamStatus` | `Pending`, `Approved`, `Rejected` |
+| `ExamAttemptStatus` | `InProgress`, `Submitted`, `Expired` |
+| `CatalogItemType` | `Resource`, `Training`, `Exam` |
 | `OrderStatus` | `Paid` (demo rejimdə yeganə istifadə olunan) |
 
 ---

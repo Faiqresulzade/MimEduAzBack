@@ -49,6 +49,7 @@ public sealed class DataSeeder
         await SeedTrainingsAsync(ct);
         await SeedTrainingLessonsAsync(ct);
         await SeedQuizzesAsync(ct);
+        await SeedExamsAsync(ct);
         await SeedCertificatesAsync(ct);
         await SeedBlogAsync(ct);
 
@@ -513,6 +514,149 @@ public sealed class DataSeeder
         await _db.SaveChangesAsync(ct);
     }
 
+    private async Task SeedExamsAsync(CancellationToken ct)
+    {
+        if (await _db.Exams.AnyAsync(ct))
+        {
+            return;
+        }
+
+        // Pulsuz, tək bölməli sınaq — girişi yoxlamaq üçün ən sadə hal.
+        var mathExam = new Exam
+        {
+            Id = Ids.ExamMathFree,
+            Name = "Riyaziyyat — sürətli sınaq",
+            Description = "Kəsrlər və faizlər üzrə qısa sınaq. Vaxt limiti 10 dəqiqədir.",
+            Subject = "Riyaziyyat",
+            Grade = 6,
+            AuthorId = Ids.Nigar,
+            DurationMinutes = 10,
+            PassPercent = 50,
+            IsPaid = false,
+            Price = 0m,
+            Status = ExamStatus.Approved,
+            ApprovedAt = DateTime.UtcNow
+        };
+
+        var mathSection = new ExamSection
+        {
+            ExamId = mathExam.Id,
+            OrderIndex = 0,
+            Subject = "Riyaziyyat"
+        };
+
+        mathSection.Questions.Add(new ExamQuestion
+        {
+            SectionId = mathSection.Id,
+            OrderIndex = 0,
+            QuestionText = "1/2 + 1/4 neçəyə bərabərdir?",
+            Options = new List<string> { "2/6", "3/4", "1/6", "2/4" },
+            CorrectOptionIndex = 1
+        });
+
+        mathSection.Questions.Add(new ExamQuestion
+        {
+            SectionId = mathSection.Id,
+            OrderIndex = 1,
+            QuestionText = "200-ün 15%-i neçədir?",
+            Options = new List<string> { "20", "25", "30", "35" },
+            CorrectOptionIndex = 2
+        });
+
+        mathSection.Questions.Add(new ExamQuestion
+        {
+            SectionId = mathSection.Id,
+            OrderIndex = 2,
+            // LaTeX ifadəsi: frontend KaTeX ilə render edir, backend sadəcə mətni saxlayır.
+            QuestionText = "$x^2 = 49$ tənliyinin müsbət kökü nədir?",
+            Options = new List<string> { "5", "6", "7", "8" },
+            CorrectOptionIndex = 2
+        });
+
+        mathExam.Sections.Add(mathSection);
+
+        // Ödənişli, çox bölməli sınaq — fənn üzrə bal bölgüsünü yoxlamaq üçün.
+        var graduationExam = new Exam
+        {
+            Id = Ids.ExamGraduation,
+            Name = "Buraxılış sınağı — I mərhələ",
+            Description = "Riyaziyyat və fizika bölmələrindən ibarət buraxılış sınağı.",
+            Subject = "Buraxılış",
+            Grade = 11,
+            AuthorId = Ids.Elvin,
+            DurationMinutes = 90,
+            PassPercent = 60,
+            IsPaid = true,
+            Price = 9.90m,
+            Status = ExamStatus.Approved,
+            ApprovedAt = DateTime.UtcNow
+        };
+
+        var mathPart = new ExamSection
+        {
+            ExamId = graduationExam.Id,
+            OrderIndex = 0,
+            Subject = "Riyaziyyat"
+        };
+
+        mathPart.Questions.Add(new ExamQuestion
+        {
+            SectionId = mathPart.Id,
+            OrderIndex = 0,
+            QuestionText = "$(a+b)^2$ ifadəsinin açılışı hansıdır?",
+            Options = new List<string>
+            {
+                "$a^2 + b^2$",
+                "$a^2 + 2ab + b^2$",
+                "$a^2 - 2ab + b^2$",
+                "$2a + 2b$"
+            },
+            CorrectOptionIndex = 1
+        });
+
+        mathPart.Questions.Add(new ExamQuestion
+        {
+            SectionId = mathPart.Id,
+            OrderIndex = 1,
+            QuestionText = "Düzbucaqlının tərəfləri 5 və 8-dirsə, sahəsi neçədir?",
+            Options = new List<string> { "13", "26", "40", "45" },
+            CorrectOptionIndex = 2
+        });
+
+        var physicsPart = new ExamSection
+        {
+            ExamId = graduationExam.Id,
+            OrderIndex = 1,
+            Subject = "Fizika"
+        };
+
+        physicsPart.Questions.Add(new ExamQuestion
+        {
+            SectionId = physicsPart.Id,
+            OrderIndex = 0,
+            QuestionText = "Sürətin düsturu hansıdır?",
+            Options = new List<string> { "$v = \\frac{s}{t}$", "$v = s \\cdot t$", "$v = \\frac{t}{s}$", "$v = s + t$" },
+            CorrectOptionIndex = 0
+        });
+
+        physicsPart.Questions.Add(new ExamQuestion
+        {
+            SectionId = physicsPart.Id,
+            OrderIndex = 1,
+            QuestionText = "SI sistemində qüvvənin vahidi hansıdır?",
+            Options = new List<string> { "Coul", "Vatt", "Nyuton", "Paskal" },
+            CorrectOptionIndex = 2
+        });
+
+        graduationExam.Sections.Add(mathPart);
+        graduationExam.Sections.Add(physicsPart);
+
+        _db.Exams.AddRange(mathExam, graduationExam);
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("2 sınaq seed edildi.");
+    }
+
     private async Task SeedCertificatesAsync(CancellationToken ct)
     {
         if (await _db.Certificates.AnyAsync(ct))
@@ -647,6 +791,9 @@ public sealed class DataSeeder
 
         public static readonly Guid QuizFractions = new("55555555-5555-5555-5555-555555555551");
         public static readonly Guid QuizPhysics = new("55555555-5555-5555-5555-555555555552");
+
+        public static readonly Guid ExamMathFree = new("99999999-9999-9999-9999-999999999991");
+        public static readonly Guid ExamGraduation = new("99999999-9999-9999-9999-999999999992");
 
         public static readonly Guid EnrollNigarAi = new("66666666-6666-6666-6666-666666666661");
         public static readonly Guid CertNigar = new("77777777-7777-7777-7777-777777777771");

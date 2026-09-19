@@ -92,5 +92,11 @@ public sealed class CertificateConfiguration : IEntityTypeConfiguration<Certific
             .WithOne(a => a.Certificate)
             .HasForeignKey<Certificate>(c => c.ResourceQuizAttemptId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Sınaq cəhdi üçün də eyni qayda.
+        builder.HasOne(c => c.ExamAttempt)
+            .WithOne(a => a.Certificate)
+            .HasForeignKey<Certificate>(c => c.ExamAttemptId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

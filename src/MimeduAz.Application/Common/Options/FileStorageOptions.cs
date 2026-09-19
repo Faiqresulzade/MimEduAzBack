@@ -11,4 +11,11 @@ public sealed class FileStorageOptions
     public long MaxFileSizeBytes { get; set; } = 25 * 1024 * 1024;
 
     public string[] AllowedExtensions { get; set; } = { ".pdf", ".docx", ".pptx" };
+
+    /// <summary>Sınaq sual şəkilləri üçün qovluq (wwwroot-a nisbətən).</summary>
+    public string ImageRootPath { get; set; } = "uploads/exams";
+
+    public long MaxImageSizeBytes { get; set; } = 5 * 1024 * 1024;
+
+    public string[] AllowedImageExtensions { get; set; } = { ".jpg", ".jpeg", ".png", ".webp" };
 }

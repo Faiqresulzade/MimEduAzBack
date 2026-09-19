@@ -26,11 +26,13 @@ public sealed class LocalFileStorageService : IFileStorageService
         _logger = logger;
     }
 
-    public async Task<string> SaveAsync(Stream fileStream, string fileName, CancellationToken ct)
+    public async Task<string> SaveAsync(
+        Stream fileStream, string fileName, CancellationToken ct, string? folder = null)
     {
         var safeName = SanitizeFileName(fileName);
         var storedName = $"{Guid.NewGuid()}-{safeName}";
-        var relativePath = Path.Combine(_options.RootPath, storedName).Replace('\\', '/');
+        var root = string.IsNullOrWhiteSpace(folder) ? _options.RootPath : folder.Trim('/');
+        var relativePath = Path.Combine(root, storedName).Replace('\\', '/');
 
         var absolutePath = ToAbsolutePath(relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);

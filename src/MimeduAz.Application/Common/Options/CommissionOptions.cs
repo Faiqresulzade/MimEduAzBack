@@ -7,4 +7,10 @@ public sealed class CommissionOptions
 
     /// <summary>Ödənişli resurs satışından platformanın payı (0.20 = 20%). Qalanı müəllifə gedir.</summary>
     public decimal ResourcePercent { get; set; } = 0.20m;
+
+    /// <summary>
+    /// Sınaq satışından platformanın payı. Sınağı da müəllim yaradıb satır,
+    /// ona görə resurslarla eyni məntiq tətbiq olunur.
+    /// </summary>
+    public decimal ExamPercent { get; set; } = 0.20m;
 }

@@ -1,5 +1,6 @@
 using MimeduAz.Contracts.Admin;
 using MimeduAz.Contracts.Common;
+using MimeduAz.Contracts.Exams;
 using MimeduAz.Contracts.Orders;
 using MimeduAz.Contracts.Resources;
 
@@ -33,6 +34,12 @@ public interface IAdminService
     Task<IReadOnlyList<ResourceDetailDto>> GetPendingResourcesAsync(CancellationToken ct);
     Task<ResourceDetailDto> ApproveResourceAsync(Guid resourceId, CancellationToken ct);
     Task<ResourceDetailDto> RejectResourceAsync(Guid resourceId, RejectResourceRequest request, CancellationToken ct);
+    /// <summary>Moderasiya gözləyən sınaqlar (bölmə və sual sayı ilə).</summary>
+    Task<IReadOnlyList<ExamDetailDto>> GetPendingExamsAsync(CancellationToken ct);
+
+    Task<ExamDetailDto> ApproveExamAsync(Guid examId, CancellationToken ct);
+    Task<ExamDetailDto> RejectExamAsync(Guid examId, RejectExamRequest request, CancellationToken ct);
+
     Task<IReadOnlyList<AdminUserDto>> GetUsersAsync(CancellationToken ct);
     Task<SalesSummaryDto> GetSalesAsync(CancellationToken ct);
     Task<IReadOnlyList<OrderDto>> GetOrdersAsync(CancellationToken ct);

@@ -33,6 +33,7 @@ public sealed class CartService : ICartService
         {
             CatalogItemType.Resource => await ResolveResourcePriceAsync(request.ItemId, userId, ct),
             CatalogItemType.Training => await ResolveTrainingPriceAsync(request.ItemId, userId, ct),
+            CatalogItemType.Exam => await ResolveExamPriceAsync(request.ItemId, userId, ct),
             _ => throw new BadRequestException("Naməlum məhsul növü.")
         };
 
@@ -154,12 +155,49 @@ public sealed class CartService : ICartService
         return training.Price;
     }
 
+    private async Task<decimal> ResolveExamPriceAsync(Guid examId, Guid userId, CancellationToken ct)
+    {
+        var exam = await _db.Exams
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == examId, ct)
+            ?? throw NotFoundException.For("Sınaq", examId);
+
+        if (exam.Status != ExamStatus.Approved)
+        {
+            throw new BadRequestException("Bu sınaq hələ təsdiqlənməyib.");
+        }
+
+        if (!exam.IsPaid)
+        {
+            throw new BadRequestException("Pulsuz sınağa birbaşa başlaya bilərsiniz, səbətə əlavə etməyə ehtiyac yoxdur.");
+        }
+
+        if (exam.AuthorId == userId)
+        {
+            throw new BadRequestException("Öz sınağınızı satın ala bilməzsiniz.");
+        }
+
+        var alreadyBought = await _db.OrderItems.AnyAsync(oi =>
+            oi.ItemType == CatalogItemType.Exam &&
+            oi.ItemId == examId &&
+            oi.Order!.UserId == userId &&
+            oi.Order.Status == OrderStatus.Paid, ct);
+
+        if (alreadyBought)
+        {
+            throw new ConflictException("Bu sınağı artıq almısınız.");
+        }
+
+        return exam.Price;
+    }
+
     private async Task<CartDto> ToDtoAsync(Cart cart, CancellationToken ct)
     {
         var items = cart.Items.OrderBy(i => i.AddedAt).ToList();
 
         var resourceIds = items.Where(i => i.ItemType == CatalogItemType.Resource).Select(i => i.ItemId).ToList();
         var trainingIds = items.Where(i => i.ItemType == CatalogItemType.Training).Select(i => i.ItemId).ToList();
+        var examIds = items.Where(i => i.ItemType == CatalogItemType.Exam).Select(i => i.ItemId).ToList();
 
         var resourceNames = await _db.Resources
             .AsNoTracking()
@@ -171,13 +209,21 @@ public sealed class CartService : ICartService
             .Where(t => trainingIds.Contains(t.Id))
             .ToDictionaryAsync(t => t.Id, t => t.Name, ct);
 
+        var examNames = await _db.Exams
+            .AsNoTracking()
+            .Where(e => examIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, e => e.Name, ct);
+
         var dtos = items.Select(i => new CartItemDto(
             i.Id,
             i.ItemType,
             i.ItemId,
-            i.ItemType == CatalogItemType.Resource
-                ? resourceNames.GetValueOrDefault(i.ItemId, "Silinmiş resurs")
-                : trainingNames.GetValueOrDefault(i.ItemId, "Silinmiş təlim"),
+            i.ItemType switch
+            {
+                CatalogItemType.Resource => resourceNames.GetValueOrDefault(i.ItemId, "Silinmiş resurs"),
+                CatalogItemType.Exam => examNames.GetValueOrDefault(i.ItemId, "Silinmiş sınaq"),
+                _ => trainingNames.GetValueOrDefault(i.ItemId, "Silinmiş təlim")
+            },
             i.Price,
             i.AddedAt)).ToList();
 

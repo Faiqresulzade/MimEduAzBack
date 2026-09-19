@@ -175,6 +175,17 @@ public sealed class CertificateDocumentService : ICertificateDocumentService
                     }
                 });
             }
+            else if (certificate.ExamAttempt?.Exam is { } exam)
+            {
+                // Sınaq sertifikatı.
+                column.Item().PaddingTop(14).AlignCenter().MaxWidth(620)
+                    .Text($"«{Shorten(exam.Name, 100)}»")
+                    .FontSize(14).Italic().FontColor(NavySoft).AlignCenter();
+
+                column.Item().PaddingTop(5).AlignCenter().MaxWidth(600)
+                    .Text($"sınağında {certificate.ExamAttempt.ScorePercent}% nəticə göstərdiyinə görə")
+                    .FontSize(11).FontColor(Muted).AlignCenter();
+            }
             else
             {
                 // Resurs imtahanı sertifikatı: mümkünsə struktur məlumatdan cümlə qururuq,

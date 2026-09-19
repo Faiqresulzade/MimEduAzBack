@@ -26,6 +26,11 @@ public sealed class ApplicationDbContext
     public DbSet<Quiz> Quizzes => Set<Quiz>();
     public DbSet<QuizQuestion> QuizQuestions => Set<QuizQuestion>();
     public DbSet<QuizAttempt> QuizAttempts => Set<QuizAttempt>();
+    public DbSet<Exam> Exams => Set<Exam>();
+    public DbSet<ExamSection> ExamSections => Set<ExamSection>();
+    public DbSet<ExamQuestion> ExamQuestions => Set<ExamQuestion>();
+    public DbSet<ExamAttempt> ExamAttempts => Set<ExamAttempt>();
+    public DbSet<ExamAnswer> ExamAnswers => Set<ExamAnswer>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<BlogPost> BlogPosts => Set<BlogPost>();
     public DbSet<RequestLog> RequestLogs => Set<RequestLog>();

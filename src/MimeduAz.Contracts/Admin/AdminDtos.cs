@@ -58,6 +58,7 @@ public sealed record AdminDashboardDto(
     AdminContentStatsDto Content,
     AdminTrainingStatsDto Trainings,
     AdminSalesStatsDto Sales,
+    AdminExamStatsDto Exams,
     IReadOnlyList<AdminTopErrorDto> TopErrors,
     IReadOnlyList<AdminTopTrainingDto> TopTrainings,
     DateTime GeneratedAt);
@@ -108,6 +109,22 @@ public sealed record AdminSalesStatsDto(
     int PendingOrders,
     int SoldResources,
     decimal ResourceRevenue);
+
+/// <summary>Sınaq göstəriciləri.</summary>
+public sealed record AdminExamStatsDto(
+    int TotalExams,
+    int PendingExams,
+    int ApprovedExams,
+    int RejectedExams,
+    int TotalQuestions,
+    int TotalAttempts,
+    /// <summary>Başlanıb, hələ təhvil verilməyib.</summary>
+    int AttemptsInProgress,
+    int PassedAttempts,
+    double AverageScorePercent,
+    /// <summary>Ödənişi tamamlanmış sifarişlərdə satılan sınaq sayı.</summary>
+    int SoldExams,
+    decimal ExamRevenue);
 
 /// <summary>Ən çox təkrarlanan xəta ünvanları.</summary>
 public sealed record AdminTopErrorDto(

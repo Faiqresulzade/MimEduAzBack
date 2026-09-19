@@ -12,4 +12,9 @@ public interface INotificationService
     /// Yeni resurs moderasiya növbəsinə düşəndə bütün adminlərə məktub göndərir.
     /// </summary>
     Task NotifyAdminsOfPendingResourceAsync(Resource resource, CancellationToken ct);
+
+    /// <summary>
+    /// Yeni sınaq moderasiya növbəsinə düşəndə bütün adminlərə məktub göndərir.
+    /// </summary>
+    Task NotifyAdminsOfPendingExamAsync(Exam exam, CancellationToken ct);
 }

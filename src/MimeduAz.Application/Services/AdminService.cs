@@ -7,6 +7,7 @@ using MimeduAz.Application.Common.Mappings;
 using MimeduAz.Application.Common.Options;
 using MimeduAz.Contracts.Admin;
 using MimeduAz.Contracts.Common;
+using MimeduAz.Contracts.Exams;
 using MimeduAz.Contracts.Orders;
 using MimeduAz.Contracts.Resources;
 using MimeduAz.Domain.Enums;
@@ -77,6 +78,64 @@ public sealed class AdminService : IAdminService
 
         return resource.ToDetailDto(ModeratorView);
     }
+
+    /// <summary>Moderator sınağın bütün məzmununu görməlidir, ona görə admin görünüşü ilə qaytarılır.</summary>
+    private static readonly ExamViewContext ExamModeratorView =
+        new(IsPurchased: false, IsAuthor: false, IsAdmin: true);
+
+    public async Task<IReadOnlyList<ExamDetailDto>> GetPendingExamsAsync(CancellationToken ct)
+    {
+        var exams = await _db.Exams
+            .AsNoTracking()
+            .Include(e => e.Author)
+            .Include(e => e.Sections)
+                .ThenInclude(s => s.Questions)
+            .Where(e => e.Status == ExamStatus.Pending)
+            .OrderBy(e => e.CreatedAt)
+            .ToListAsync(ct);
+
+        return exams.Select(e => e.ToDetailDto(ExamModeratorView, attemptCount: 0)).ToList();
+    }
+
+    public async Task<ExamDetailDto> ApproveExamAsync(Guid examId, CancellationToken ct)
+    {
+        var exam = await LoadExamForModerationAsync(examId, ct);
+
+        exam.Status = ExamStatus.Approved;
+        exam.ApprovedAt = DateTime.UtcNow;
+        exam.RejectionReason = null;
+
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Sınaq təsdiqləndi. ExamId: {ExamId}", examId);
+
+        return exam.ToDetailDto(ExamModeratorView, await CountExamAttemptsAsync(examId, ct));
+    }
+
+    public async Task<ExamDetailDto> RejectExamAsync(
+        Guid examId, RejectExamRequest request, CancellationToken ct)
+    {
+        var exam = await LoadExamForModerationAsync(examId, ct);
+
+        exam.Status = ExamStatus.Rejected;
+        exam.ApprovedAt = null;
+        exam.RejectionReason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
+
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Sınaq rədd edildi. ExamId: {ExamId}", examId);
+
+        return exam.ToDetailDto(ExamModeratorView, await CountExamAttemptsAsync(examId, ct));
+    }
+
+    private async Task<Domain.Entities.Exam> LoadExamForModerationAsync(Guid examId, CancellationToken ct) =>
+        await _db.Exams
+            .Include(e => e.Author)
+            .Include(e => e.Sections)
+                .ThenInclude(s => s.Questions)
+            .FirstOrDefaultAsync(e => e.Id == examId, ct)
+        ?? throw NotFoundException.For("Sınaq", examId);
+
+    private Task<int> CountExamAttemptsAsync(Guid examId, CancellationToken ct) =>
+        _db.ExamAttempts.CountAsync(a => a.ExamId == examId, ct);
 
     public async Task<IReadOnlyList<AdminUserDto>> GetUsersAsync(CancellationToken ct)
     {
@@ -178,6 +237,7 @@ public sealed class AdminService : IAdminService
             await BuildContentStatsAsync(ct),
             await BuildTrainingStatsAsync(ct),
             await BuildSalesStatsAsync(ct),
+            await BuildExamStatsAsync(ct),
             await BuildTopErrorsAsync(ct),
             await BuildTopTrainingsAsync(ct),
             DateTime.UtcNow);
@@ -315,6 +375,53 @@ public sealed class AdminService : IAdminService
     }
 
     /// <summary>Ən çox təkrarlanan uğursuz ünvanlar - problemi tez tapmaq üçün.</summary>
+    private async Task<AdminExamStatsDto> BuildExamStatsAsync(CancellationToken ct)
+    {
+        var exams = await _db.Exams
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Pending = g.Count(e => e.Status == ExamStatus.Pending),
+                Approved = g.Count(e => e.Status == ExamStatus.Approved),
+                Rejected = g.Count(e => e.Status == ExamStatus.Rejected)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var attempts = await _db.ExamAttempts
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Passed = g.Count(a => a.Passed),
+                InProgress = g.Count(a => a.Status == ExamAttemptStatus.InProgress),
+                AverageScore = g.Average(a => (double?)a.ScorePercent)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var sold = await _db.OrderItems
+            .AsNoTracking()
+            .Where(oi => oi.ItemType == CatalogItemType.Exam && oi.Order!.Status == OrderStatus.Paid)
+            .GroupBy(_ => 1)
+            .Select(g => new { Count = g.Count(), Revenue = g.Sum(oi => oi.Price) })
+            .FirstOrDefaultAsync(ct);
+
+        return new AdminExamStatsDto(
+            exams?.Total ?? 0,
+            exams?.Pending ?? 0,
+            exams?.Approved ?? 0,
+            exams?.Rejected ?? 0,
+            await _db.ExamQuestions.CountAsync(ct),
+            attempts?.Total ?? 0,
+            attempts?.InProgress ?? 0,
+            attempts?.Passed ?? 0,
+            Math.Round(attempts?.AverageScore ?? 0, 1),
+            sold?.Count ?? 0,
+            sold?.Revenue ?? 0m);
+    }
+
     private async Task<IReadOnlyList<AdminTopErrorDto>> BuildTopErrorsAsync(CancellationToken ct)
     {
         // Qruplaşdırmanı birbaşa record-a proyeksiya etmək EF-də tərcümə olunmur,

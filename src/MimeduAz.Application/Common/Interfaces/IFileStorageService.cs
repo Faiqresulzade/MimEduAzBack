@@ -6,8 +6,12 @@ namespace MimeduAz.Application.Common.Interfaces;
 /// </summary>
 public interface IFileStorageService
 {
-    /// <summary>Faylı saxlayır və sonradan oxumaq üçün nisbi yolu qaytarır.</summary>
-    Task<string> SaveAsync(Stream fileStream, string fileName, CancellationToken ct);
+    /// <summary>
+    /// Faylı saxlayır və sonradan oxumaq üçün nisbi yolu qaytarır.
+    /// <paramref name="folder"/> verilsə fayl default qovluq əvəzinə orada saxlanılır
+    /// (məs. sınaq sual şəkilləri resurs fayllarından ayrı qovluqda qalır).
+    /// </summary>
+    Task<string> SaveAsync(Stream fileStream, string fileName, CancellationToken ct, string? folder = null);
 
     Task<Stream> GetAsync(string filePath, CancellationToken ct);
 

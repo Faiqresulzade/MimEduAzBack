@@ -4,5 +4,6 @@ namespace MimeduAz.Domain.Enums;
 public enum CatalogItemType
 {
     Resource = 0,
-    Training = 1
+    Training = 1,
+    Exam = 2
 }

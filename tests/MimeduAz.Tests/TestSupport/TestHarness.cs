@@ -61,12 +61,14 @@ public sealed class FakeFileStorageService : IFileStorageService
 
     public IReadOnlyDictionary<string, byte[]> Files => _files;
 
-    public async Task<string> SaveAsync(Stream fileStream, string fileName, CancellationToken ct)
+    public async Task<string> SaveAsync(
+        Stream fileStream, string fileName, CancellationToken ct, string? folder = null)
     {
         using var memory = new MemoryStream();
         await fileStream.CopyToAsync(memory, ct);
 
-        var path = $"uploads/resources/{Guid.NewGuid()}-{Path.GetFileName(fileName)}";
+        var root = string.IsNullOrWhiteSpace(folder) ? "uploads/resources" : folder.Trim('/');
+        var path = $"{root}/{Guid.NewGuid()}-{Path.GetFileName(fileName)}";
         _files[path] = memory.ToArray();
         return path;
     }
@@ -119,6 +121,12 @@ public sealed class FakeNotificationService : INotificationService
     public Task NotifyAdminsOfPendingResourceAsync(Resource resource, CancellationToken ct)
     {
         _notified.Add(resource.Id);
+        return Task.CompletedTask;
+    }
+
+    public Task NotifyAdminsOfPendingExamAsync(Exam exam, CancellationToken ct)
+    {
+        _notified.Add(exam.Id);
         return Task.CompletedTask;
     }
 }

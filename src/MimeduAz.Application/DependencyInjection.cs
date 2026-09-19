@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<ICartService, CartService>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<IQuizService, QuizService>();
+        services.AddScoped<IExamService, ExamService>();
         services.AddScoped<ICertificateService, CertificateService>();
         services.AddScoped<IAdminService, AdminService>();
         services.AddScoped<IBlogService, BlogService>();

@@ -173,6 +173,54 @@ public sealed class CertificateService : ICertificateService
         return certificate.ToDto();
     }
 
+    public async Task<CertificateDto> IssueForExamAttemptAsync(Guid attemptId, CancellationToken ct)
+    {
+        var existing = await _db.Certificates
+            .Include(c => c.User)
+            .FirstOrDefaultAsync(c => c.ExamAttemptId == attemptId, ct);
+
+        if (existing is not null)
+        {
+            return existing.ToDto();
+        }
+
+        var attempt = await _db.ExamAttempts
+            .Include(a => a.User)
+            .Include(a => a.Exam)
+            .FirstOrDefaultAsync(a => a.Id == attemptId, ct)
+            ?? throw NotFoundException.For("Sınaq cəhdi", attemptId);
+
+        if (!attempt.Passed)
+        {
+            throw new BadRequestException("Sertifikat yalnız keçid balından yuxarı sınaq nəticəsi üçün verilir.");
+        }
+
+        var issuedAt = DateTime.UtcNow;
+
+        var certificate = new Certificate
+        {
+            Code = await GenerateCertificateCodeAsync(issuedAt, ct),
+            UserId = attempt.UserId,
+            ExamAttemptId = attempt.Id,
+            Description = BuildExamDescription(
+                attempt.User?.FullName ?? string.Empty,
+                attempt.Exam?.Name ?? "Sınaq",
+                attempt.ScorePercent,
+                issuedAt),
+            IssuedAt = issuedAt
+        };
+
+        _db.Certificates.Add(certificate);
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Sınaq sertifikatı verildi. CertificateId: {CertificateId}, AttemptId: {AttemptId}",
+            certificate.Id, attempt.Id);
+
+        certificate.User = attempt.User;
+        return certificate.ToDto();
+    }
+
     public async Task<CertificateDto> IssueForTrainingCompletionAsync(Guid enrollmentId, CancellationToken ct)
     {
         var enrollment = await _db.Enrollments
@@ -239,6 +287,9 @@ public sealed class CertificateService : ICertificateService
             .Include(c => c.ResourceQuizAttempt)!
                 .ThenInclude(a => a!.Quiz)!
                     .ThenInclude(q => q!.Resource)
+            // Sınaq sertifikatında sınağın adı və nəticə faizi sənəddə göstərilir.
+            .Include(c => c.ExamAttempt)!
+                .ThenInclude(a => a!.Exam)
             .FirstOrDefaultAsync(c => c.Code.ToUpper() == normalized, ct)
             ?? throw new NotFoundException($"«{normalized}» kodlu sertifikat tapılmadı.");
 
@@ -247,6 +298,9 @@ public sealed class CertificateService : ICertificateService
 
     private static string BuildTrainingDescription(string fullName, string trainingName, int hours, DateTime issuedAt) =>
         $"{fullName} · «{trainingName}» · {hours} saat · {issuedAt.ToString("dd.MM.yyyy", AzCulture)}";
+
+    private static string BuildExamDescription(string fullName, string examName, int score, DateTime issuedAt) =>
+        $"{fullName} · «{examName}» sınağı · {score}% · {issuedAt.ToString("dd.MM.yyyy", AzCulture)}";
 
     private static string BuildQuizDescription(string fullName, string resourceName, int score, DateTime issuedAt) =>
         $"{fullName} · «{resourceName}» imtahanı · {score}% · {issuedAt.ToString("dd.MM.yyyy", AzCulture)}";

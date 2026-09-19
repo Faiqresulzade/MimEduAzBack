@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MimeduAz.Application.Services;
 using MimeduAz.Contracts.Admin;
 using MimeduAz.Contracts.Common;
+using MimeduAz.Contracts.Exams;
 using MimeduAz.Contracts.Orders;
 using MimeduAz.Contracts.Resources;
 using MimeduAz.Domain.Constants;
@@ -51,6 +52,27 @@ public sealed class AdminController : ControllerBase
     public async Task<ActionResult<ResourceDetailDto>> Reject(
         Guid id, RejectResourceRequest? request, CancellationToken ct) =>
         Ok(await _admin.RejectResourceAsync(id, request ?? new RejectResourceRequest(), ct));
+
+    /// <summary>Moderasiya növbəsi — təsdiq gözləyən sınaqlar (bölmə və suallarla).</summary>
+    [HttpGet("exams/pending")]
+    [ProducesResponseType(typeof(IReadOnlyList<ExamDetailDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ExamDetailDto>>> PendingExams(CancellationToken ct) =>
+        Ok(await _admin.GetPendingExamsAsync(ct));
+
+    /// <summary>Sınağı təsdiqləyir — kataloqda görünür və satışa çıxır.</summary>
+    [HttpPost("exams/{id:guid}/approve")]
+    [ProducesResponseType(typeof(ExamDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ExamDetailDto>> ApproveExam(Guid id, CancellationToken ct) =>
+        Ok(await _admin.ApproveExamAsync(id, ct));
+
+    /// <summary>Sınağı rədd edir (opsional səbəblə).</summary>
+    [HttpPost("exams/{id:guid}/reject")]
+    [ProducesResponseType(typeof(ExamDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ExamDetailDto>> RejectExam(
+        Guid id, RejectExamRequest? request, CancellationToken ct) =>
+        Ok(await _admin.RejectExamAsync(id, request ?? new RejectExamRequest(), ct));
 
     /// <summary>Bütün istifadəçilər və onların statistikası.</summary>
     [HttpGet("users")]
