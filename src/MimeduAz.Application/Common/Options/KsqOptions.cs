@@ -27,7 +27,17 @@ public sealed class OpenRouterOptions
 
     public string BaseUrl { get; set; } = "https://openrouter.ai/api/v1/";
 
-    public string VisionModel { get; set; } = "google/gemini-2.5-flash";
+    /// <summary>
+    /// Əsas model. 2026-10 benchmark-ı (23 model, 3 kart növü): claude-haiku-5.5 100% dəqiq,
+    /// iki işarəli sualı düzgün null edir, 1000 kart ≈ $0.5.
+    /// </summary>
+    public string VisionModel { get; set; } = "anthropic/claude-haiku-5.5";
+
+    /// <summary>
+    /// Əsas model xəta verəndə (limit, kəsilmə) OpenRouter sorğunu sıra ilə bunlara ötürür
+    /// (<c>models</c> parametri). Pulsuz nemotron benchmark-da 100% idi, amma yavaş və limitlidir.
+    /// </summary>
+    public string[] FallbackModels { get; set; } = Array.Empty<string>();
 
     public int TimeoutSeconds { get; set; } = 60;
 

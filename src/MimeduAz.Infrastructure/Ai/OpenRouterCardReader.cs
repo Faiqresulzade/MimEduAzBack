@@ -46,8 +46,13 @@ public sealed class OpenRouterCardReader : IKsqCardReader
                 "Avtomatik oxuma hələ qurulmayıb. Cavabları əl ilə qeyd edin.");
         }
 
+        var fallbacks = _options.FallbackModels
+            .Where(m => !string.IsNullOrWhiteSpace(m) && m != _options.VisionModel)
+            .ToList();
+
         var body = new ChatRequest(
             _options.VisionModel,
+            fallbacks.Count > 0 ? fallbacks.Prepend(_options.VisionModel).ToList() : null,
             new[]
             {
                 new ChatMessage("user", new object[]
@@ -79,9 +84,12 @@ public sealed class OpenRouterCardReader : IKsqCardReader
             using var response = await _http.SendAsync(request, timeout.Token);
             payload = await response.Content.ReadAsStringAsync(timeout.Token);
 
+            // Ehtiyat modelə keçid olubsa, cavabı verən model loqda görünsün.
             _logger.LogInformation(
                 "KSQ kartı oxundu: model {Model}, status {Status}, {Elapsed} ms",
-                _options.VisionModel, (int)response.StatusCode, (int)(DateTime.UtcNow - started).TotalMilliseconds);
+                ReadModel(payload) ?? _options.VisionModel,
+                (int)response.StatusCode,
+                (int)(DateTime.UtcNow - started).TotalMilliseconds);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -152,6 +160,19 @@ public sealed class OpenRouterCardReader : IKsqCardReader
         }
     }
 
+    private static string? ReadModel(string payload)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(payload);
+            return document.RootElement.TryGetProperty("model", out var model) ? model.GetString() : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private static string? TryReadErrorMessage(string payload)
     {
         try
@@ -170,6 +191,7 @@ public sealed class OpenRouterCardReader : IKsqCardReader
 
     private sealed record ChatRequest(
         [property: JsonPropertyName("model")] string Model,
+        [property: JsonPropertyName("models")] IReadOnlyList<string>? Models,
         [property: JsonPropertyName("messages")] IReadOnlyList<ChatMessage> Messages,
         [property: JsonPropertyName("temperature")] double Temperature,
         [property: JsonPropertyName("max_tokens")] int MaxTokens,

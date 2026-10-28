@@ -16,7 +16,7 @@ saxlanır və CSV kimi yüklənir. Frontend: `/panel/ksq-yoxlama` (müəllim pan
 | Massivlər | PostgreSQL **`jsonb`** sütunları (ballar, açarlar, cavablar, səhv suallar). |
 | Bal | Server client-in balına güvənmir — saxlayanda açara görə **yenidən hesablayır**. |
 | Şəkil | **Saxlanmır** — nə diskə, nə bazaya, nə loga. Yaddaşda oxunur, OpenRouter-ə gedir, atılır. |
-| AI modeli | `google/gemini-2.5-flash` (`OpenRouter:VisionModel` ilə dəyişir). |
+| AI modeli | `anthropic/claude-haiku-5.5`, ehtiyat: pulsuz `nvidia/nemotron-3.5-super-vl:free` (`OpenRouter:VisionModel`, `OpenRouter:FallbackModels`). 23 modelin benchmark-ında yalnız bu ikisi və gemini-3.7-flash 100% verdi; Haiku 1000 kart ≈ $0.5. |
 | Limit | Müəllim başına **dəqiqədə 20, sutkada 500** şəkil (`429`). Timeout **60 s** (`504`). |
 
 Orijinal artifact HTML-i əlçatan olmadığı üçün prompt, JSON sxemi, CSV formatı və UI mətnləri
