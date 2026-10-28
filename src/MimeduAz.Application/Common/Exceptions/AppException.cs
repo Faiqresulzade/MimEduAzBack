@@ -61,6 +61,27 @@ public sealed class ValidationFailedException : AppException
     public IDictionary<string, string[]> Errors { get; }
 }
 
+/// <summary>429 — istifadəçi limiti keçib.</summary>
+public sealed class TooManyRequestsException : AppException
+{
+    public TooManyRequestsException(string message) : base(message, StatusCodes.TooManyRequests) { }
+}
+
+/// <summary>
+/// Xarici xidmət (məs. OpenRouter) cavab vermədi və ya səhv cavab verdi.
+/// 502 — səhv cavab, 503 — xidmət konfiqurasiya olunmayıb, 504 — vaxt bitdi.
+/// </summary>
+public sealed class ExternalServiceException : AppException
+{
+    private ExternalServiceException(string message, int statusCode) : base(message, statusCode) { }
+
+    public static ExternalServiceException BadGateway(string message) => new(message, StatusCodes.BadGateway);
+
+    public static ExternalServiceException Unavailable(string message) => new(message, StatusCodes.ServiceUnavailable);
+
+    public static ExternalServiceException Timeout(string message) => new(message, StatusCodes.GatewayTimeout);
+}
+
 internal static class StatusCodes
 {
     public const int BadRequest = 400;
@@ -68,4 +89,8 @@ internal static class StatusCodes
     public const int Forbidden = 403;
     public const int NotFound = 404;
     public const int Conflict = 409;
+    public const int TooManyRequests = 429;
+    public const int BadGateway = 502;
+    public const int ServiceUnavailable = 503;
+    public const int GatewayTimeout = 504;
 }

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using MimeduAz.Application.Common.Interfaces;
 using MimeduAz.Application.Common.Options;
 using MimeduAz.Domain.Entities;
+using MimeduAz.Infrastructure.Ai;
 using MimeduAz.Infrastructure.Certificates;
 using MimeduAz.Infrastructure.Identity;
 using MimeduAz.Infrastructure.Email;
@@ -63,6 +64,15 @@ public static class DependencyInjection
             sp.GetRequiredService<IOptions<FileStorageOptions>>(),
             webRootPath,
             sp.GetRequiredService<ILogger<LocalFileStorageService>>()));
+
+        // KSQ kart oxuma: vaxt limiti oxuyucunun özündədir (OpenRouter:TimeoutSeconds),
+        // HttpClient-in öz limiti yalnız ehtiyat üçündür.
+        services.AddHttpClient<IKsqCardReader, OpenRouterCardReader>((sp, client) =>
+        {
+            var options = sp.GetRequiredService<IOptions<OpenRouterOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds + 15);
+        });
 
         services.AddScoped<DataSeeder>();
 

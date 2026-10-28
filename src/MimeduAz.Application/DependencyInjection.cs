@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MimeduAz.Application.Common.Options;
 using MimeduAz.Application.Services;
 
@@ -17,6 +18,17 @@ public static class DependencyInjection
         services.Configure<RequestLogOptions>(configuration.GetSection(RequestLogOptions.SectionName));
         services.Configure<CertificateOptions>(configuration.GetSection(CertificateOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.Configure<KsqOptions>(configuration.GetSection(KsqOptions.SectionName));
+        services.Configure<OpenRouterOptions>(configuration.GetSection(OpenRouterOptions.SectionName));
+
+        // Hostinq panellərində açar çox vaxt sadə OPENROUTER_API_KEY adı ilə verilir.
+        services.PostConfigure<OpenRouterOptions>(options =>
+        {
+            if (string.IsNullOrWhiteSpace(options.ApiKey))
+            {
+                options.ApiKey = configuration["OPENROUTER_API_KEY"];
+            }
+        });
 
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
 
@@ -31,6 +43,11 @@ public static class DependencyInjection
         services.AddScoped<IAdminService, AdminService>();
         services.AddScoped<IBlogService, BlogService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IKsqService, KsqService>();
+
+        // Limit sayğacları bütün sorğular arasında paylaşılır.
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<IKsqScanRateLimiter, KsqScanRateLimiter>();
 
         return services;
     }

@@ -610,6 +610,118 @@ namespace MimeduAz.Infrastructure.Persistence.Migrations
                     b.ToTable("exam_sections", (string)null);
                 });
 
+            modelBuilder.Entity("MimeduAz.Domain.Entities.KsqResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Ad")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Answers")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kod")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("MaxScore")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<string>("OpenScores")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal>("Score")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<string>("Sinif")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TestName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Variant")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)");
+
+                    b.Property<string>("WrongQuestions")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TestId");
+
+                    b.HasIndex("UserId", "TestId", "Sinif");
+
+                    b.ToTable("ksq_results", (string)null);
+                });
+
+            modelBuilder.Entity("MimeduAz.Domain.Entities.KsqTest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClosedPoints")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("KeyA")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("KeyB")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("OpenPoints")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ksq_tests", (string)null);
+                });
+
             modelBuilder.Entity("MimeduAz.Domain.Entities.LessonCompletion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1302,6 +1414,36 @@ namespace MimeduAz.Infrastructure.Persistence.Migrations
                     b.Navigation("Exam");
                 });
 
+            modelBuilder.Entity("MimeduAz.Domain.Entities.KsqResult", b =>
+                {
+                    b.HasOne("MimeduAz.Domain.Entities.KsqTest", "Test")
+                        .WithMany("Results")
+                        .HasForeignKey("TestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MimeduAz.Domain.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Test");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("MimeduAz.Domain.Entities.KsqTest", b =>
+                {
+                    b.HasOne("MimeduAz.Domain.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("MimeduAz.Domain.Entities.LessonCompletion", b =>
                 {
                     b.HasOne("MimeduAz.Domain.Entities.Enrollment", "Enrollment")
@@ -1470,6 +1612,11 @@ namespace MimeduAz.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MimeduAz.Domain.Entities.ExamSection", b =>
                 {
                     b.Navigation("Questions");
+                });
+
+            modelBuilder.Entity("MimeduAz.Domain.Entities.KsqTest", b =>
+                {
+                    b.Navigation("Results");
                 });
 
             modelBuilder.Entity("MimeduAz.Domain.Entities.Order", b =>

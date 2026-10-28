@@ -34,6 +34,8 @@ public sealed class ApplicationDbContext
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<BlogPost> BlogPosts => Set<BlogPost>();
     public DbSet<RequestLog> RequestLogs => Set<RequestLog>();
+    public DbSet<KsqTest> KsqTests => Set<KsqTest>();
+    public DbSet<KsqResult> KsqResults => Set<KsqResult>();
 
     // IApplicationDbContext, IdentityDbContext-in Users/Roles/UserRoles xassələrini yenidən elan etmir -
     // baza sinfindəki DbSet-lər interfeysi olduğu kimi qarşılayır.

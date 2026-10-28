@@ -37,6 +37,8 @@ public interface IApplicationDbContext
     DbSet<Certificate> Certificates { get; }
     DbSet<BlogPost> BlogPosts { get; }
     DbSet<RequestLog> RequestLogs { get; }
+    DbSet<KsqTest> KsqTests { get; }
+    DbSet<KsqResult> KsqResults { get; }
 
     DatabaseFacade Database { get; }
 
