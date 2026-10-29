@@ -4,6 +4,7 @@
  * API işləyərkən (seed data ilə):
  *   node scripts/ksq-test.mjs                 # AI oxuması olmadan
  *   node scripts/ksq-test.mjs path/kart.jpg   # + real OpenRouter oxuması (OpenRouter:ApiKey lazımdır)
+ *   node scripts/ksq-test.mjs kart.jpg kart25.jpg  # + Sərbəst (25+3) kartının oxunması
  *
  * Şəkil üçün gözlənilən kart: 14 qapalı sual, cavablar ABADEABCDBABCD
  * (açar ABCDEABCDEABCD — 3 və 10 səhv), ad "Əli Məmmədov", variant A, kod 1234.
@@ -197,6 +198,75 @@ async function main() {
   check('nəticə silindi', (await call('DELETE', `/ksq/results/${single.body.id}`, { token: nigar })).status === 204);
   const afterDelete = await call('GET', `/ksq/results?testId=${t15.id}`, { token: nigar });
   check('silinəndən sonra 2 nəticə', afterDelete.body?.items.length === 2);
+
+  section('Sərbəst format: 25 qapalı + 3 açıq, qarışıq ballar');
+  const customClosed = Array.from({ length: 25 }, (_, i) => (i % 5) + 1); // cəmi 75
+  const customOpen = [5, 10, 10];
+  const custom = await call('POST', '/ksq/tests', {
+    token: nigar,
+    body: {
+      name: 'KSQ test — Sərbəst 25+3',
+      closedPoints: customClosed,
+      openPoints: customOpen,
+      keyA: repeat([...'ABCDE'], 25),
+      keyB: repeat([...'EDCBA'], 25),
+    },
+  });
+  check('Sərbəst test yaradıldı', custom.status === 200, custom.text);
+  created.push(custom.body);
+
+  const reloaded = (await call('GET', '/ksq/tests', { token: nigar })).body?.find((t) => t.id === custom.body?.id);
+  check('yenidən yükləndi: ballar eynidir',
+    reloaded?.closedPoints.join() === customClosed.join() && reloaded?.openPoints.join() === customOpen.join());
+  check('yenidən yükləndi: açarlar eynidir',
+    reloaded?.keyA.join('') === repeat([...'ABCDE'], 25).join('') && reloaded?.keyB.join('') === repeat([...'EDCBA'], 25).join(''));
+  check('heç bir preset-ə uyğun deyil (Sərbəst)',
+    !PRESETS.some((p) => p.closed.join() === customClosed.join() && p.open.join() === customOpen.join()));
+
+  const shortKey = await call('POST', '/ksq/tests', {
+    token: nigar,
+    body: { name: 'x', closedPoints: customClosed, openPoints: customOpen, keyA: repeat(['A'], 24), keyB: repeat(['A'], 25) },
+  });
+  check('açar sual sayından qısadır — 400', shortKey.status === 400);
+
+  const tooMany = await call('POST', '/ksq/tests', {
+    token: nigar,
+    body: { name: 'x', closedPoints: repeat([1], 61), openPoints: [], keyA: repeat([null], 61), keyB: repeat([null], 61) },
+  });
+  check('61 qapalı sual — 400', tooMany.status === 400);
+
+  // Şagird: 7 və 19 səhv, 25 boş.
+  const expectedCustom = [...'ABCDEAECDEABCDEABCAEABCD'].concat([null]);
+  let customAnswers = expectedCustom;
+  const customImage = process.argv[3];
+  if (customImage) {
+    const form = new FormData();
+    form.append('image', new Blob([await readFile(customImage)], { type: 'image/jpeg' }), 'kart.jpg');
+    form.append('closedCount', '25');
+    form.append('openCount', '3');
+    const scan = await call('POST', '/ksq/scan', { token: nigar, form });
+    console.log(`        ${scan.text}`);
+    check('AI 25 suallıq kartı oxudu', scan.status === 200 && scan.body?.cavablar.length === 25, scan.text);
+    check('AI 3 açıq sual qaytardı', scan.body?.aciqCavablar.length === 3);
+    check('25 cavab düzgün oxundu',
+      scan.body?.cavablar.map((c) => c ?? '-').join('') === expectedCustom.map((c) => c ?? '-').join(''),
+      scan.body?.cavablar.map((c) => c ?? '-').join(''));
+    customAnswers = scan.body?.cavablar ?? expectedCustom;
+  } else {
+    console.log('  SKIP  25 suallıq kartın AI oxuması (2-ci şəkil yolu verilməyib)');
+  }
+
+  const customResult = await call('POST', '/ksq/results', {
+    token: nigar,
+    body: {
+      testId: custom.body.id, sinif: '10A', ad: 'Nərmin Qasımova', variant: 'A', kod: '7788',
+      cavablar: customAnswers, aciq: [5, 8, 10],
+    },
+  });
+  // 75 - (7-ci: 2) - (19-cu: 4) - (25-ci: 5) + 23 = 87
+  check('Sərbəst: bal 87 / 100', customResult.body?.bal === 87 && customResult.body?.max === 100,
+    `${customResult.body?.bal} / ${customResult.body?.max}`);
+  check('Sərbəst: səhv suallar 7, 19, 25', customResult.body?.sehv.join(',') === '7,19,25', customResult.body?.sehv.join(','));
 
   section('Test silinəndə nəticələri də silinir');
   for (const test of created) {

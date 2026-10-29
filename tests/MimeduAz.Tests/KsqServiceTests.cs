@@ -5,6 +5,7 @@ using MimeduAz.Application.Common.Interfaces;
 using MimeduAz.Application.Common.Options;
 using MimeduAz.Application.Common.Utilities;
 using MimeduAz.Application.Services;
+using MimeduAz.Application.Validators;
 using MimeduAz.Contracts.Ksq;
 using MimeduAz.Infrastructure.Ai;
 using MimeduAz.Infrastructure.Persistence;
@@ -54,6 +55,76 @@ public sealed class KsqServiceTests
     [InlineData("", null)]
     public void NormalizeLetter_accepts_only_single_A_to_E(string input, string? expected) =>
         KsqScoring.NormalizeLetter(input).Should().Be(expected);
+
+    // ------------------------------------------------------------ Validasiya (preset və Sərbəst)
+
+    [Fact]
+    public void Validator_accepts_custom_format_25_closed_and_3_open()
+    {
+        var request = new SaveKsqTestRequest
+        {
+            Name = "Sərbəst",
+            ClosedPoints = Enumerable.Range(0, 25).Select(i => i % 5 + 1).ToList(),
+            OpenPoints = new List<int> { 5, 10, 0 },
+            KeyA = Enumerable.Repeat<string?>(null, 25).ToList(),
+            KeyB = Enumerable.Repeat<string?>("C", 25).ToList()
+        };
+
+        new SaveKsqTestRequestValidator().Validate(request).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(0, 1, 100, 0)]   // 0 qapalı sual
+    [InlineData(61, 0, 1, 61)]   // 60-dan çox
+    [InlineData(5, 11, 1, 5)]    // 10-dan çox açıq sual
+    [InlineData(5, 1, 101, 5)]   // bal > 100
+    [InlineData(5, 1, -1, 5)]    // mənfi bal
+    [InlineData(5, 1, 10, 4)]    // açar qısadır
+    [InlineData(5, 1, 10, 6)]    // açar uzundur
+    public void Validator_rejects_out_of_range_counts_points_and_key_lengths(
+        int closed, int open, int points, int keyLength)
+    {
+        var request = new SaveKsqTestRequest
+        {
+            Name = "Test",
+            ClosedPoints = Enumerable.Repeat(points, closed).ToList(),
+            OpenPoints = Enumerable.Repeat(Math.Clamp(points, 0, 100), open).ToList(),
+            KeyA = Enumerable.Repeat<string?>(null, keyLength).ToList(),
+            KeyB = Enumerable.Repeat<string?>(null, keyLength).ToList()
+        };
+
+        new SaveKsqTestRequestValidator().Validate(request).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Custom_format_scores_with_its_own_counts_and_points()
+    {
+        await using var db = TestHarness.CreateDb();
+        var sut = CreateSut(db, TeacherId);
+        var closed = Enumerable.Range(0, 25).Select(i => i % 5 + 1).ToList(); // 1..5 təkrarlanır, cəmi 75
+        var test = await sut.CreateTestAsync(new SaveKsqTestRequest
+        {
+            Name = "Sərbəst 25+3",
+            ClosedPoints = closed,
+            OpenPoints = new List<int> { 5, 10, 10 },
+            KeyA = Enumerable.Repeat<string?>("B", 25).ToList(),
+            KeyB = Enumerable.Repeat<string?>(null, 25).ToList()
+        }, CancellationToken.None);
+
+        var answers = Enumerable.Repeat<string?>("B", 25).ToList();
+        answers[24] = "A"; // 25-ci sual (5 bal) səhv
+
+        var result = await sut.SaveResultAsync(new SaveKsqResultRequest
+        {
+            TestId = test.Id, Variant = "A", Cavablar = answers, Aciq = new List<decimal?> { 5, 7.5m, null }
+        }, CancellationToken.None);
+
+        result.Max.Should().Be(75 + 25);
+        result.Bal.Should().Be(75 - 5 + 5 + 7.5m);
+        result.Sehv.Should().Equal(25);
+        result.Cavablar.Should().HaveCount(25);
+        result.Aciq.Should().Equal(5m, 7.5m, 0m);
+    }
 
     // ------------------------------------------------------------ Testlər
 

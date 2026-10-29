@@ -26,13 +26,15 @@ public sealed class SaveKsqTestRequestValidator : AbstractValidator<SaveKsqTestR
         RuleForEach(x => x.OpenPoints)
             .InclusiveBetween(0, 100).WithMessage("Sualın balı 0-100 aralığında olmalıdır.");
 
+        // Preset və Sərbəst eyni yoxlamadan keçir: açarın hər qapalı sual üçün bir yeri olmalıdır
+        // (cavab seçilməyibsə null).
         RuleFor(x => x.KeyA)
-            .Must((request, key) => key.Count <= request.ClosedPoints.Count)
-            .WithMessage("A variantının açarında sual sayından çox cavab var.");
+            .Must((request, key) => key.Count == request.ClosedPoints.Count)
+            .WithMessage("A variantının açarı qapalı sual sayı qədər olmalıdır.");
 
         RuleFor(x => x.KeyB)
-            .Must((request, key) => key.Count <= request.ClosedPoints.Count)
-            .WithMessage("B variantının açarında sual sayından çox cavab var.");
+            .Must((request, key) => key.Count == request.ClosedPoints.Count)
+            .WithMessage("B variantının açarı qapalı sual sayı qədər olmalıdır.");
 
         RuleForEach(x => x.KeyA).Must(BeLetterOrNull).WithMessage("Cavab A, B, C, D və ya E olmalıdır.");
         RuleForEach(x => x.KeyB).Must(BeLetterOrNull).WithMessage("Cavab A, B, C, D və ya E olmalıdır.");
