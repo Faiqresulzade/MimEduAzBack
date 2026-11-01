@@ -38,3 +38,23 @@ public sealed record UserDto(
     /// <summary>Resurs yükləyib sata bilirmi (Teacher və ya Admin).</summary>
     bool CanPublishResources,
     DateTime CreatedAt);
+
+/// <summary>
+/// Google ilə giriş. <paramref name="IdToken"/> — Google Identity Services-in verdiyi "credential".
+/// Yeni istifadəçi üçün ilk sorğu <paramref name="AccountType"/>-siz gəlir; cavabda
+/// <see cref="GoogleLoginResponse.RequiresAccountType"/> true olarsa eyni token hesab növü ilə yenidən göndərilir.
+/// </summary>
+public sealed record GoogleLoginRequest(string IdToken, AccountType? AccountType = null);
+
+/// <summary>
+/// Hesab varsa <see cref="Auth"/> doludur. Yoxdursa hesab hələ yaradılmır —
+/// <see cref="RequiresAccountType"/> true, frontend "Müəlliməm / Şagirdəm" soruşur.
+/// </summary>
+public sealed record GoogleLoginResponse(
+    bool RequiresAccountType,
+    AuthResponse? Auth,
+    string? Email,
+    string? FullName);
+
+/// <summary>Frontend Google düyməsini yalnız ClientId doludursa göstərir.</summary>
+public sealed record GoogleConfigResponse(string? ClientId);

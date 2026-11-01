@@ -33,6 +33,25 @@ public sealed class AuthController : ControllerBase
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request, CancellationToken ct) =>
         Ok(await _auth.LoginAsync(request, ct));
 
+    /// <summary>Google düyməsi üçün Client ID. Google girişi qurulmayıbsa <c>clientId: null</c>.</summary>
+    [HttpGet("google/config")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(GoogleConfigResponse), StatusCodes.Status200OK)]
+    public ActionResult<GoogleConfigResponse> GoogleConfig() => Ok(_auth.GetGoogleConfig());
+
+    /// <summary>
+    /// Google ID token ilə giriş. Eyni e-poçtlu hesab varsa ona daxil olur (avtomatik birləşmə).
+    /// Yeni istifadəçidə <c>accountType</c> yoxdursa <c>requiresAccountType: true</c> qaytarır —
+    /// frontend hesab növünü soruşub eyni token ilə təkrar göndərir.
+    /// </summary>
+    [HttpPost("google")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(GoogleLoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<GoogleLoginResponse>> Google(GoogleLoginRequest request, CancellationToken ct) =>
+        Ok(await _auth.GoogleLoginAsync(request, ct));
+
     /// <summary>Refresh token-i yenisi ilə əvəz edib yeni access token verir (rotasiya).</summary>
     [HttpPost("refresh")]
     [AllowAnonymous]

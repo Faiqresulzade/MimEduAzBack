@@ -6,6 +6,15 @@ public interface IAuthService
 {
     Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct);
     Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct);
+
+    /// <summary>Frontend üçün Google Client ID (qurulmayıbsa null).</summary>
+    GoogleConfigResponse GetGoogleConfig();
+
+    /// <summary>
+    /// Google ID token ilə giriş/qeydiyyat. Eyni e-poçtlu hesab varsa ona daxil olur.
+    /// Yeni istifadəçidə hesab növü göndərilməyibsə <c>RequiresAccountType</c> qaytarır.
+    /// </summary>
+    Task<GoogleLoginResponse> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken ct);
     Task<AuthResponse> RefreshAsync(RefreshTokenRequest request, CancellationToken ct);
     Task LogoutAsync(LogoutRequest request, CancellationToken ct);
     Task<UserDto> GetCurrentUserAsync(CancellationToken ct);

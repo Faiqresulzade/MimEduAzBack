@@ -19,6 +19,7 @@ public static class DependencyInjection
         services.Configure<CertificateOptions>(configuration.GetSection(CertificateOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
         services.Configure<KsqOptions>(configuration.GetSection(KsqOptions.SectionName));
+        services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<OpenRouterOptions>(configuration.GetSection(OpenRouterOptions.SectionName));
 
         // Hostinq panellərində açar çox vaxt sadə OPENROUTER_API_KEY adı ilə verilir.

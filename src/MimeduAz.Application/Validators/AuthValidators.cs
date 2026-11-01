@@ -48,3 +48,17 @@ public sealed class LogoutRequestValidator : AbstractValidator<LogoutRequest>
     public LogoutRequestValidator() =>
         RuleFor(x => x.RefreshToken).NotEmpty().WithMessage("Refresh token boş ola bilməz.");
 }
+
+public sealed class GoogleLoginRequestValidator : AbstractValidator<GoogleLoginRequest>
+{
+    public GoogleLoginRequestValidator()
+    {
+        RuleFor(x => x.IdToken)
+            .NotEmpty().WithMessage("Google token göndərilməyib.")
+            .MaximumLength(4096).WithMessage("Google token düzgün deyil.");
+
+        RuleFor(x => x.AccountType)
+            .IsInEnum().When(x => x.AccountType.HasValue)
+            .WithMessage("Hesab növü düzgün deyil.");
+    }
+}

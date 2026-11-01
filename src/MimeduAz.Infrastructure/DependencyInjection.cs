@@ -56,6 +56,7 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<ApplicationDbContext>();
 
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
 
         // Sertifikat renderi vəziyyət saxlamır - singleton kifayətdir.
         services.AddSingleton<ICertificateDocumentService, CertificateDocumentService>();
