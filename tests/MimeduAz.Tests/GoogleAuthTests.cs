@@ -142,7 +142,48 @@ public sealed class GoogleAuthTests : IAsyncLifetime
         await act.Should().ThrowAsync<ExternalServiceException>();
     }
 
-    private AuthService Sut(string? clientId = ClientId)
+    [Fact]
+    public async Task Deleting_account_removes_personal_data_and_blocks_all_logins()
+    {
+        var user = new ApplicationUser { UserName = "sil@gmail.com", Email = "sil@gmail.com", FullName = "Silinən", Subject = "Kimya" };
+        (await _users.CreateAsync(user, "Sifre1234!")).Succeeded.Should().BeTrue();
+        await _users.AddToRoleAsync(user, AppRoles.Teacher);
+        await _users.AddLoginAsync(user, new UserLoginInfo("Google", "google-sub-del", "Google"));
+        var login = await Sut().LoginAsync(new LoginRequest("sil@gmail.com", "Sifre1234!"), CancellationToken.None);
+
+        await Sut(userId: user.Id).DeleteCurrentAccountAsync(CancellationToken.None);
+
+        var stored = await _db.Users.SingleAsync(u => u.Id == user.Id);
+        stored.FullName.Should().Be("Silinmiş istifadəçi");
+        stored.Email.Should().NotContain("sil@gmail.com");
+        stored.Subject.Should().BeNull();
+        stored.PasswordHash.Should().BeNull();
+        (await _users.GetLoginsAsync(stored)).Should().BeEmpty();
+
+        var password = () => Sut().LoginAsync(new LoginRequest("sil@gmail.com", "Sifre1234!"), CancellationToken.None);
+        await password.Should().ThrowAsync<UnauthorizedException>();
+        var refresh = () => Sut().RefreshAsync(new RefreshTokenRequest(login.RefreshToken), CancellationToken.None);
+        await refresh.Should().ThrowAsync<UnauthorizedException>();
+
+        // Eyni e-poçtla yenidən qeydiyyat mümkündür (yeni, boş hesab).
+        var again = await Sut().RegisterAsync(
+            new RegisterRequest("Yeni", "sil@gmail.com", "Sifre1234!", null, AccountType.Student), CancellationToken.None);
+        again.User.Id.Should().NotBe(user.Id);
+    }
+
+    [Fact]
+    public async Task Admin_account_cannot_be_deleted_from_app()
+    {
+        var admin = new ApplicationUser { UserName = "a@x.az", Email = "a@x.az", FullName = "Admin" };
+        (await _users.CreateAsync(admin, "Sifre1234!")).Succeeded.Should().BeTrue();
+        await _users.AddToRoleAsync(admin, AppRoles.Admin);
+
+        var act = () => Sut(userId: admin.Id).DeleteCurrentAccountAsync(CancellationToken.None);
+
+        await act.Should().ThrowAsync<BadRequestException>();
+    }
+
+    private AuthService Sut(string? clientId = ClientId, Guid? userId = null)
     {
         var jwt = Options.Create(new JwtOptions
         {
@@ -153,7 +194,7 @@ public sealed class GoogleAuthTests : IAsyncLifetime
             _users,
             _db,
             new JwtTokenGenerator(jwt),
-            new FakeCurrentUserService(),
+            new FakeCurrentUserService(userId),
             _google,
             jwt,
             Options.Create(new GoogleAuthOptions { ClientId = clientId }),

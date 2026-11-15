@@ -24,4 +24,11 @@ public interface IAuthService
     /// material yükləyə bilsin. Artıq müəllifdirsə heç nə dəyişmir (idempotent).
     /// </summary>
     Task<UserDto> BecomeAuthorAsync(BecomeAuthorRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Cari istifadəçinin hesabını silir (Google Play tələbi). Şəxsi data (ad, e-poçt, fənn,
+    /// şifrə, Google bağlantısı, səbət, token-lər) silinir; sifariş və sertifikat qeydləri
+    /// başqa istifadəçilərin hüquqlarını qorumaq üçün adsız saxlanır. Geri qaytarılmır.
+    /// </summary>
+    Task DeleteCurrentAccountAsync(CancellationToken ct);
 }

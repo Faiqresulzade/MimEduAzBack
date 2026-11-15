@@ -89,4 +89,19 @@ public sealed class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<UserDto>> BecomeAuthor(BecomeAuthorRequest? request, CancellationToken ct) =>
         Ok(await _auth.BecomeAuthorAsync(request ?? new BecomeAuthorRequest(null), ct));
+
+    /// <summary>
+    /// Cari istifadəçinin hesabını həmişəlik silir: şəxsi data silinir, giriş bağlanır.
+    /// Sifariş və sertifikat qeydləri adsız saxlanır. Geri qaytarılmır.
+    /// </summary>
+    [HttpDelete("me")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DeleteMe(CancellationToken ct)
+    {
+        await _auth.DeleteCurrentAccountAsync(ct);
+        return NoContent();
+    }
 }

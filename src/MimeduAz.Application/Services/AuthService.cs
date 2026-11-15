@@ -258,6 +258,60 @@ public sealed class AuthService : IAuthService
         return ToDto(user, roles);
     }
 
+    public async Task DeleteCurrentAccountAsync(CancellationToken ct)
+    {
+        var userId = _currentUser.RequireUserId();
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct)
+                   ?? throw new NotFoundException("İstifadəçi tapılmadı.");
+
+        if (await _userManager.IsInRoleAsync(user, AppRoles.Admin))
+        {
+            throw new BadRequestException("Admin hesabı tətbiqdən silinə bilməz.");
+        }
+
+        // Google və digər xarici giriş bağlantıları.
+        foreach (var login in await _userManager.GetLoginsAsync(user))
+        {
+            await _userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
+        }
+
+        if (await _userManager.HasPasswordAsync(user))
+        {
+            await _userManager.RemovePasswordAsync(user);
+        }
+
+        var now = DateTime.UtcNow;
+        var tokens = await _db.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ToListAsync(ct);
+        foreach (var token in tokens)
+        {
+            token.RevokedAt = now;
+        }
+
+        var carts = await _db.Carts.Where(c => c.UserId == userId).ToListAsync(ct);
+        _db.Carts.RemoveRange(carts);
+
+        // Şəxsi məlumatlar silinir; Id qalır ki, sifariş, sertifikat və müəllif resursları
+        // (onları almış istifadəçilər üçün) pozulmasın.
+        var anonymous = $"deleted-{user.Id:N}@deleted.mimedu.az";
+        user.FullName = "Silinmiş istifadəçi";
+        user.Subject = null;
+        user.Email = anonymous;
+        user.NormalizedEmail = anonymous.ToUpperInvariant();
+        user.UserName = anonymous;
+        user.NormalizedUserName = anonymous.ToUpperInvariant();
+        user.EmailConfirmed = false;
+        user.PhoneNumber = null;
+        user.PhoneNumberConfirmed = false;
+        user.LockoutEnabled = true;
+        user.LockoutEnd = DateTimeOffset.MaxValue;
+        user.SecurityStamp = Guid.NewGuid().ToString();
+
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("İstifadəçi hesabını sildi. UserId: {UserId}", user.Id);
+    }
+
     public async Task<UserDto> BecomeAuthorAsync(BecomeAuthorRequest request, CancellationToken ct)
     {
         var userId = _currentUser.RequireUserId();
