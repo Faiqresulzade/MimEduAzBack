@@ -36,6 +36,8 @@ public sealed class ApplicationDbContext
     public DbSet<RequestLog> RequestLogs => Set<RequestLog>();
     public DbSet<KsqTest> KsqTests => Set<KsqTest>();
     public DbSet<KsqResult> KsqResults => Set<KsqResult>();
+    public DbSet<PaymentLog> PaymentLogs => Set<PaymentLog>();
+    public DbSet<PayoutRequest> PayoutRequests => Set<PayoutRequest>();
 
     // IApplicationDbContext, IdentityDbContext-in Users/Roles/UserRoles xassələrini yenidən elan etmir -
     // baza sinfindəki DbSet-lər interfeysi olduğu kimi qarşılayır.

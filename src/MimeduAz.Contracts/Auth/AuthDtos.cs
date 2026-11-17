@@ -11,7 +11,9 @@ public sealed record RegisterRequest(
     string Email,
     string Password,
     string? Subject,
-    AccountType? AccountType = null);
+    AccountType? AccountType = null,
+    /// <summary>İstifadə şərtləri və məxfilik siyasəti ilə razılıq - qeydiyyat üçün məcburidir.</summary>
+    bool AcceptTerms = false);
 
 public sealed record LoginRequest(string Email, string Password);
 
@@ -44,7 +46,7 @@ public sealed record UserDto(
 /// Yeni istifadəçi üçün ilk sorğu <paramref name="AccountType"/>-siz gəlir; cavabda
 /// <see cref="GoogleLoginResponse.RequiresAccountType"/> true olarsa eyni token hesab növü ilə yenidən göndərilir.
 /// </summary>
-public sealed record GoogleLoginRequest(string IdToken, AccountType? AccountType = null);
+public sealed record GoogleLoginRequest(string IdToken, AccountType? AccountType = null, bool AcceptTerms = false);
 
 /// <summary>
 /// Hesab varsa <see cref="Auth"/> doludur. Yoxdursa hesab hələ yaradılmır —

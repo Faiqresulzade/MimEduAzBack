@@ -25,6 +25,9 @@ public sealed class RegisterRequestValidator : AbstractValidator<RegisterRequest
         RuleFor(x => x.Subject)
             .MaximumLength(100)
             .When(x => !string.IsNullOrWhiteSpace(x.Subject));
+
+        RuleFor(x => x.AcceptTerms)
+            .Equal(true).WithMessage("Qeydiyyat üçün İstifadə şərtləri və Məxfilik siyasəti ilə razılaşmalısınız.");
     }
 }
 

@@ -23,6 +23,7 @@ public sealed class AuthService : IAuthService
     private readonly IGoogleTokenValidator _google;
     private readonly JwtOptions _jwt;
     private readonly GoogleAuthOptions _googleOptions;
+    private readonly PaymentOptions _payment;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -33,6 +34,7 @@ public sealed class AuthService : IAuthService
         IGoogleTokenValidator google,
         IOptions<JwtOptions> jwt,
         IOptions<GoogleAuthOptions> googleOptions,
+        IOptions<PaymentOptions> payment,
         ILogger<AuthService> logger)
     {
         _userManager = userManager;
@@ -42,6 +44,7 @@ public sealed class AuthService : IAuthService
         _google = google;
         _jwt = jwt.Value;
         _googleOptions = googleOptions.Value;
+        _payment = payment.Value;
         _logger = logger;
     }
 
@@ -61,7 +64,9 @@ public sealed class AuthService : IAuthService
             Email = email,
             FullName = request.FullName.Trim(),
             Subject = string.IsNullOrWhiteSpace(request.Subject) ? null : request.Subject.Trim(),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            TermsAcceptedAt = DateTime.UtcNow,
+            TermsVersion = _payment.TermsVersion
         };
 
         var created = await _userManager.CreateAsync(user, request.Password);
@@ -156,6 +161,13 @@ public sealed class AuthService : IAuthService
             return new GoogleLoginResponse(true, null, identity.Email, fullName);
         }
 
+        // Yeni hesab yalnız şərtlərlə razılıqdan sonra yaradılır (hesab növü ekranındakı checkbox).
+        if (!request.AcceptTerms)
+        {
+            throw new ValidationFailedException(
+                "acceptTerms", "Qeydiyyat üçün İstifadə şərtləri və Məxfilik siyasəti ilə razılaşmalısınız.");
+        }
+
         user = new ApplicationUser
         {
             Id = Guid.NewGuid(),
@@ -163,7 +175,9 @@ public sealed class AuthService : IAuthService
             Email = identity.Email,
             EmailConfirmed = true,
             FullName = fullName,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            TermsAcceptedAt = DateTime.UtcNow,
+            TermsVersion = _payment.TermsVersion
         };
 
         // Şifrəsiz yaradılır - giriş yalnız Google ilə.

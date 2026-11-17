@@ -5,10 +5,14 @@ namespace MimeduAz.Application.Services;
 public interface IOrderService
 {
     /// <summary>
-    /// Səbəti sifarişə çevirir. Demo rejim: heç bir xarici ödəniş provayderi çağırılmır,
-    /// sifariş birbaşa "Paid" statusunda yaradılır.
+    /// Səbəti sifarişə çevirir. Pulsuz səbət dərhal tamamlanır. Ödənişli səbət Pending sifariş
+    /// yaradır və AzeriCard səhifəsinə yönləndirmə formu qaytarır; giriş bank təsdiqindən sonra açılır.
+    /// Kartla ödəniş söndürülübsə ödənişli checkout 409 qaytarır.
     /// </summary>
-    Task<OrderDto> CheckoutAsync(CheckoutRequest request, CancellationToken ct);
+    Task<CheckoutResponse> CheckoutAsync(CheckoutRequest request, CancellationToken ct);
 
     Task<IReadOnlyList<OrderDto>> GetMineAsync(CancellationToken ct);
+
+    /// <summary>Ödəniş nəticəsi səhifəsi üçün: cari istifadəçinin sifarişi (kodla).</summary>
+    Task<OrderDto> GetMineByCodeAsync(string code, CancellationToken ct);
 }

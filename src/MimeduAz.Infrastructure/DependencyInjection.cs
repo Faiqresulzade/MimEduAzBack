@@ -12,6 +12,7 @@ using MimeduAz.Infrastructure.Certificates;
 using MimeduAz.Infrastructure.Identity;
 using MimeduAz.Infrastructure.Email;
 using MimeduAz.Infrastructure.Logging;
+using MimeduAz.Infrastructure.Payments;
 using MimeduAz.Infrastructure.Persistence;
 using MimeduAz.Infrastructure.Storage;
 
@@ -74,6 +75,12 @@ public static class DependencyInjection
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds + 15);
         });
+
+        // AzeriCard: server-server sorğular (tamamlama, status, qaytarma) üçün HttpClient.
+        services.AddHttpClient<IPaymentGateway, AzeriCardGateway>();
+
+        // Pending sifarişlərin bankdan statusunu yoxlayan fon işi.
+        services.AddHostedService<PaymentStatusWorker>();
 
         services.AddScoped<DataSeeder>();
 

@@ -91,7 +91,7 @@ public sealed class GoogleAuthTests : IAsyncLifetime
         _google.Next = new GoogleIdentity("google-sub-3", "muellim@gmail.com", true, "Gülüm Bəşirova");
 
         var result = await Sut().GoogleLoginAsync(
-            new GoogleLoginRequest("token", AccountType.Teacher), CancellationToken.None);
+            new GoogleLoginRequest("token", AccountType.Teacher, AcceptTerms: true), CancellationToken.None);
 
         result.Auth!.User.FullName.Should().Be("Gülüm Bəşirova");
         result.Auth.User.Roles.Should().Equal(AppRoles.Teacher);
@@ -100,6 +100,8 @@ public sealed class GoogleAuthTests : IAsyncLifetime
         var user = await _users.FindByEmailAsync("muellim@gmail.com");
         user!.EmailConfirmed.Should().BeTrue();
         (await _users.HasPasswordAsync(user)).Should().BeFalse();
+        user.TermsAcceptedAt.Should().NotBeNull();
+        user.TermsVersion.Should().Be("2026-11-17");
 
         // İkinci dəfə Google ilə - eyni hesab, sual verilmir.
         var again = await Sut().GoogleLoginAsync(new GoogleLoginRequest("token"), CancellationToken.None);
@@ -108,10 +110,22 @@ public sealed class GoogleAuthTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task New_user_is_not_created_without_accepting_terms()
+    {
+        _google.Next = new GoogleIdentity("google-sub-6", "razi@gmail.com", true, "Razı Deyil");
+
+        var act = () => Sut().GoogleLoginAsync(
+            new GoogleLoginRequest("token", AccountType.Teacher), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ValidationFailedException>();
+        _db.Users.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Password_login_to_google_only_account_explains_how_to_sign_in()
     {
         _google.Next = new GoogleIdentity("google-sub-4", "g@gmail.com", true, "G");
-        await Sut().GoogleLoginAsync(new GoogleLoginRequest("token", AccountType.Student), CancellationToken.None);
+        await Sut().GoogleLoginAsync(new GoogleLoginRequest("token", AccountType.Student, AcceptTerms: true), CancellationToken.None);
 
         var act = () => Sut().LoginAsync(new LoginRequest("g@gmail.com", "nəsə123"), CancellationToken.None);
 
@@ -198,6 +212,7 @@ public sealed class GoogleAuthTests : IAsyncLifetime
             _google,
             jwt,
             Options.Create(new GoogleAuthOptions { ClientId = clientId }),
+            Options.Create(new PaymentOptions { TermsVersion = "2026-11-17" }),
             NullLogger<AuthService>.Instance);
     }
 

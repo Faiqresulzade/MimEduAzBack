@@ -55,6 +55,22 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.CommissionAmount).HasPrecision(10, 2);
         builder.Property(o => o.Status).IsRequired().HasConversion<string>().HasMaxLength(20);
 
+        // AzeriCard ORDER: callback bu nömrə ilə sifarişi tapır.
+        builder.Property(o => o.PaymentNumber).HasMaxLength(32);
+        builder.HasIndex(o => o.PaymentNumber).IsUnique();
+
+        builder.Property(o => o.CardMask).HasMaxLength(32);
+        builder.Property(o => o.Rrn).HasMaxLength(20);
+        builder.Property(o => o.IntRef).HasMaxLength(64);
+        // Bir bank əməliyyatı yalnız bir sifarişi ödəyə bilər (təkrar istifadə olunmuş callback-ə qarşı).
+        builder.HasIndex(o => o.IntRef).IsUnique();
+        builder.Property(o => o.ApprovalCode).HasMaxLength(10);
+        builder.Property(o => o.PaymentResult).HasMaxLength(100);
+        builder.Property(o => o.TermsVersion).HasMaxLength(20);
+
+        // Status yoxlaması fon işi Pending sifarişləri tarixə görə seçir.
+        builder.HasIndex(o => new { o.Status, o.CreatedAt });
+
         builder.HasOne(o => o.User)
             .WithMany()
             .HasForeignKey(o => o.UserId)
@@ -83,5 +99,40 @@ public sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
         builder.Property(i => i.AuthorPayoutAmount).HasPrecision(10, 2);
 
         builder.HasIndex(i => new { i.ItemType, i.ItemId });
+    }
+}
+
+public sealed class PaymentLogConfiguration : IEntityTypeConfiguration<PaymentLog>
+{
+    public void Configure(EntityTypeBuilder<PaymentLog> builder)
+    {
+        builder.ToTable("payment_logs");
+        builder.HasKey(l => l.Id);
+        builder.Property(l => l.Kind).IsRequired().HasMaxLength(20);
+        builder.Property(l => l.Payload).IsRequired();
+        builder.HasIndex(l => l.OrderId);
+        builder.HasIndex(l => l.CreatedAt);
+    }
+}
+
+public sealed class PayoutRequestConfiguration : IEntityTypeConfiguration<PayoutRequest>
+{
+    public void Configure(EntityTypeBuilder<PayoutRequest> builder)
+    {
+        builder.ToTable("payout_requests");
+        builder.HasKey(p => p.Id);
+        builder.Property(p => p.Amount).HasPrecision(10, 2);
+        builder.Property(p => p.Iban).IsRequired().HasMaxLength(34);
+        builder.Property(p => p.AccountHolder).IsRequired().HasMaxLength(150);
+        builder.Property(p => p.Fin).IsRequired().HasMaxLength(7);
+        builder.Property(p => p.Status).IsRequired().HasConversion<string>().HasMaxLength(20);
+        builder.Property(p => p.AdminNote).HasMaxLength(500);
+
+        builder.HasOne(p => p.User)
+            .WithMany()
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(p => new { p.UserId, p.Status });
     }
 }

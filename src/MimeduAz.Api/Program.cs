@@ -144,6 +144,13 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSwaggerWithJwt();
 
+// HSTS: brauzer bu domenə 1 il yalnız HTTPS ilə müraciət edir (bank yoxlaması tələbi).
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(365);
+    options.IncludeSubDomains = true;
+});
+
 var app = builder.Build();
 
 // Render/Heroku/Railway kimi platformalarda TLS bir kənar proksidə bitir və tətbiqə
@@ -157,6 +164,34 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 forwardedHeadersOptions.KnownNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
+// Təhlükəsizlik header-ləri. API yalnız JSON qaytarır - heç bir səhifədə iframe, skript və ya
+// plugin lazım deyil. Swagger UI öz skriptlərini işlədir, ona görə CSP yalnız /api-yə tətbiq olunur.
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        var headers = context.Response.Headers;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+        }
+
+        return Task.CompletedTask;
+    });
+
+    await next();
+});
 
 // Qalxarkən icazə verilən origin-ləri loglayırıq - CORS problemini diaqnoz etmək üçün
 // ilk baxılacaq yer məhz budur (Render/hostinq loglarında dərhal görünür).

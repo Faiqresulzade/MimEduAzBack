@@ -17,21 +17,30 @@ public sealed class OrderService : IOrderService
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
     private readonly CommissionOptions _commission;
+    private readonly PaymentOptions _payment;
+    private readonly IPaymentGateway _gateway;
+    private readonly OrderFulfillment _fulfillment;
     private readonly ILogger<OrderService> _logger;
 
     public OrderService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
         IOptions<CommissionOptions> commission,
+        IOptions<PaymentOptions> payment,
+        IPaymentGateway gateway,
+        OrderFulfillment fulfillment,
         ILogger<OrderService> logger)
     {
         _db = db;
         _currentUser = currentUser;
         _commission = commission.Value;
+        _payment = payment.Value;
+        _gateway = gateway;
+        _fulfillment = fulfillment;
         _logger = logger;
     }
 
-    public async Task<OrderDto> CheckoutAsync(CheckoutRequest request, CancellationToken ct)
+    public async Task<CheckoutResponse> CheckoutAsync(CheckoutRequest request, CancellationToken ct)
     {
         var userId = _currentUser.RequireUserId();
 
@@ -72,14 +81,10 @@ public sealed class OrderService : IOrderService
             CustomerName = string.IsNullOrWhiteSpace(request.CustomerName)
                 ? user.FullName
                 : request.CustomerName.Trim(),
-            Status = OrderStatus.Paid,
+            // Giriş yalnız Paid-də açılır: pulsuz səbət dərhal, ödənişli isə bank təsdiqindən sonra.
+            Status = OrderStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
-
-        var existingEnrollments = await _db.Enrollments
-            .Where(e => e.UserId == userId && trainingIds.Contains(e.TrainingId))
-            .Select(e => e.TrainingId)
-            .ToListAsync(ct);
 
         foreach (var item in items)
         {
@@ -153,35 +158,69 @@ public sealed class OrderService : IOrderService
                     CommissionAmount = 0m,
                     AuthorPayoutAmount = 0m
                 });
-
-                if (!existingEnrollments.Contains(training.Id))
-                {
-                    _db.Enrollments.Add(new Enrollment
-                    {
-                        UserId = userId,
-                        TrainingId = training.Id,
-                        ProgressPercent = 0,
-                        Status = EnrollmentStatus.InProgress,
-                        EnrolledAt = DateTime.UtcNow
-                    });
-                    existingEnrollments.Add(training.Id);
-                }
             }
         }
 
         order.TotalAmount = order.Items.Sum(i => i.Price);
         order.CommissionAmount = order.Items.Sum(i => i.CommissionAmount);
 
+        // Pulsuz səbət (məs. pulsuz təlimlər): bank lazım deyil, dərhal tamamlanır.
+        if (order.TotalAmount <= 0)
+        {
+            _db.Orders.Add(order);
+            await _fulfillment.MarkPaidAsync(order, ct);
+            return new CheckoutResponse(order.ToDto(), null);
+        }
+
+        if (!request.AcceptTerms)
+        {
+            throw new ValidationFailedException(
+                "acceptTerms", "Ödəniş üçün istifadə şərtləri, geri qaytarma və xidmətin təqdimi qaydaları ilə razılaşmalısınız.");
+        }
+
+        if (!_payment.Enabled || !_gateway.IsConfigured)
+        {
+            throw new ConflictException(
+                "Kartla ödəniş tezliklə aktiv olacaq. Hazırda yalnız pulsuz məhsulları əldə etmək mümkündür.");
+        }
+
+        order.TermsAcceptedAt = DateTime.UtcNow;
+        order.TermsVersion = _payment.TermsVersion;
+        order.PaymentNumber = await GeneratePaymentNumberAsync(ct);
+
+        // Səbət ödəniş təsdiqlənənə qədər qalır - bankdan geri qayıdan istifadəçi yenidən cəhd edə bilər.
         _db.Orders.Add(order);
+        await _db.SaveChangesAsync(ct);
 
-        // Səbət boşaldılır - sifariş və enrollment-lərlə birlikdə tək SaveChanges-də atomik yazılır.
-        _db.CartItems.RemoveRange(items);
+        var redirect = _gateway.CreateSale(order, $"MIMEDU.AZ sifariş {order.Code}", user.Email, request.ClientInfo);
 
+        _db.PaymentLogs.Add(new PaymentLog
+        {
+            OrderId = order.Id,
+            Kind = "Request",
+            // İmza, nonce və brauzer məlumatı olmadan - nəyin göndərildiyini göstərmək kifayətdir.
+            Payload = System.Text.Json.JsonSerializer.Serialize(
+                redirect.Fields.Where(f => f.Key is not ("P_SIGN" or "NONCE" or "M_INFO"))
+                    .ToDictionary(f => f.Key, f => f.Value))
+        });
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
-            "Sifariş tamamlandı (demo ödəniş). OrderId: {OrderId}, Sətir sayı: {ItemCount}",
-            order.Id, order.Items.Count);
+            "Ödəniş başladıldı. Sifariş: {Code}, ORDER: {PaymentNumber}, Məbləğ: {Amount}",
+            order.Code, order.PaymentNumber, order.TotalAmount);
+
+        return new CheckoutResponse(order.ToDto(), new PaymentRedirectDto(redirect.Url, redirect.Fields));
+    }
+
+    public async Task<OrderDto> GetMineByCodeAsync(string code, CancellationToken ct)
+    {
+        var userId = _currentUser.RequireUserId();
+
+        var order = await _db.Orders
+            .AsNoTracking()
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o => o.Code == code && o.UserId == userId, ct)
+            ?? throw new NotFoundException("Sifariş tapılmadı.");
 
         return order.ToDto();
     }
@@ -198,6 +237,25 @@ public sealed class OrderService : IOrderService
             .ToListAsync(ct);
 
         return orders.Select(o => o.ToDto()).ToList();
+    }
+
+    /// <summary>
+    /// AzeriCard ORDER: yalnız rəqəm, 6–20 simvol, terminal üzrə gün ərzində unikal
+    /// (son 6 rəqəm bankda audit nömrəsidir). yyMMddHHmmss + 4 təsadüfi rəqəm = 16 rəqəm.
+    /// </summary>
+    private async Task<string> GeneratePaymentNumberAsync(CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var number = DateTime.UtcNow.ToString("yyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture)
+                         + System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 10000).ToString("D4");
+            if (!await _db.Orders.AnyAsync(o => o.PaymentNumber == number, ct))
+            {
+                return number;
+            }
+        }
+
+        throw new ConflictException("Sifariş nömrəsi yaradılmadı. Yenidən cəhd edin.");
     }
 
     private Task<string> GenerateOrderCodeAsync(CancellationToken ct) =>

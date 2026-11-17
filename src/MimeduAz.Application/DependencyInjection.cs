@@ -20,6 +20,9 @@ public static class DependencyInjection
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
         services.Configure<KsqOptions>(configuration.GetSection(KsqOptions.SectionName));
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
+        services.Configure<PaymentOptions>(configuration.GetSection(PaymentOptions.SectionName));
+        services.Configure<AzeriCardOptions>(configuration.GetSection(AzeriCardOptions.SectionName));
+        services.Configure<SellerOptions>(configuration.GetSection(SellerOptions.SectionName));
         services.Configure<OpenRouterOptions>(configuration.GetSection(OpenRouterOptions.SectionName));
 
         // Hostinq panellərində açar çox vaxt sadə OPENROUTER_API_KEY adı ilə verilir.
@@ -45,6 +48,9 @@ public static class DependencyInjection
         services.AddScoped<IBlogService, BlogService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IKsqService, KsqService>();
+        services.AddScoped<OrderFulfillment>();
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IPayoutService, PayoutService>();
 
         // Limit sayğacları bütün sorğular arasında paylaşılır.
         services.TryAddSingleton(TimeProvider.System);

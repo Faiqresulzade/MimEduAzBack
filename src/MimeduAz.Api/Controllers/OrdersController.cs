@@ -6,7 +6,7 @@ using MimeduAz.Contracts.Orders;
 
 namespace MimeduAz.Api.Controllers;
 
-/// <summary>Sifarişlər və demo checkout.</summary>
+/// <summary>Sifarişlər və checkout.</summary>
 [ApiController]
 [Route("api/v1/orders")]
 [Authorize]
@@ -18,23 +18,31 @@ public sealed class OrdersController : ControllerBase
     public OrdersController(IOrderService orders) => _orders = orders;
 
     /// <summary>
-    /// Səbəti sifarişə çevirir və "Paid" statusunda tamamlayır (demo ödəniş).
-    /// Təlim sətirləri üçün avtomatik enrollment yaradılır, səbət boşaldılır.
-    /// DİQQƏT: bu endpoint heç bir kart məlumatı qəbul etmir və saxlamır.
+    /// Səbəti sifarişə çevirir. Pulsuz səbət dərhal tamamlanır (<c>payment: null</c>).
+    /// Ödənişli səbətdə sifariş Pending yaradılır və <c>payment</c> formu qaytarılır — frontend
+    /// istifadəçini onunla AzeriCard səhifəsinə POST edir. Giriş yalnız bank təsdiqindən sonra açılır.
+    /// Kart məlumatı qəbul edilmir. Kartla ödəniş söndürülübsə ödənişli səbət 409 alır.
     /// </summary>
     [HttpPost("checkout")]
-    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(CheckoutResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<OrderDto>> Checkout(CheckoutRequest? request, CancellationToken ct)
+    public async Task<ActionResult<CheckoutResponse>> Checkout(CheckoutRequest? request, CancellationToken ct)
     {
-        var order = await _orders.CheckoutAsync(request ?? new CheckoutRequest(), ct);
-        return Created($"/api/v1/orders/{order.Id}", order);
+        var result = await _orders.CheckoutAsync(request ?? new CheckoutRequest(), ct);
+        return Created($"/api/v1/orders/{result.Order.Code}", result);
     }
 
-    /// <summary>Cari istifadəçinin sifariş tarixçəsi.</summary>
+    /// <summary>Cari istifadəçinin sifariş tarixçəsi (qəbz məlumatı ilə).</summary>
     [HttpGet("mine")]
     [ProducesResponseType(typeof(IReadOnlyList<OrderDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<OrderDto>>> Mine(CancellationToken ct) =>
         Ok(await _orders.GetMineAsync(ct));
+
+    /// <summary>Ödəniş nəticəsi səhifəsi üçün: sifarişin statusu (yalnız sahibinə).</summary>
+    [HttpGet("{code}")]
+    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OrderDto>> Get(string code, CancellationToken ct) =>
+        Ok(await _orders.GetMineByCodeAsync(code, ct));
 }

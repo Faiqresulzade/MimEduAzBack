@@ -12,6 +12,13 @@ public class ApplicationUser : IdentityUser<Guid>
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// İstifadə şərtləri və məxfilik siyasəti ilə razılaşdığı an və o anki versiya.
+    /// Bu tətbiqdən əvvəl açılmış hesablarda null.
+    /// </summary>
+    public DateTime? TermsAcceptedAt { get; set; }
+    public string? TermsVersion { get; set; }
+
     public ICollection<Resource> Resources { get; set; } = new List<Resource>();
     public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
     public ICollection<Certificate> Certificates { get; set; } = new List<Certificate>();

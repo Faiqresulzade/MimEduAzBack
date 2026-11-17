@@ -17,7 +17,12 @@ public static class MiscMappings
         o.CreatedAt,
         o.Items
             .Select(i => new OrderItemDto(i.Id, i.ItemType, i.ItemId, i.Name, i.Price))
-            .ToList());
+            .ToList(),
+        o.PaidAt,
+        o.CardMask,
+        o.Rrn,
+        o.ApprovalCode,
+        o.PaymentResult);
 
     public static CertificateDto ToDto(this Certificate c) => new(
         c.Id,

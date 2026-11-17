@@ -39,6 +39,8 @@ public interface IApplicationDbContext
     DbSet<RequestLog> RequestLogs { get; }
     DbSet<KsqTest> KsqTests { get; }
     DbSet<KsqResult> KsqResults { get; }
+    DbSet<PaymentLog> PaymentLogs { get; }
+    DbSet<PayoutRequest> PayoutRequests { get; }
 
     DatabaseFacade Database { get; }
 
